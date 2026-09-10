@@ -642,3 +642,31 @@ details[open] .chevron { transform: rotate(90deg); }
 .steps li { font-size: 15px; line-height: 1.45; color: var(--label-2); margin-bottom: 6px; }
 .steps li:last-child { margin-bottom: 0; }
 .detail-body .steps { padding-left: 18px; }
+
+/* Teilaufgaben einer Rechenaufgabe */
+.part { position: relative; padding: 14px 0 4px; }
+.part + .part::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 16px; right: 0;
+  height: 1px;
+  background: var(--separator);
+  transform: scaleY(.5);
+  transform-origin: top;
+}
+.part-head {
+  padding: 0 16px 4px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.part-key { color: var(--tint); margin-right: 2px; }
+.part-result {
+  padding: 2px 16px 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.part-result.ok { color: var(--green); }
+.part-result.no { color: var(--red); }
+.part .steps { padding-bottom: 10px; }
+.formula + .formula { border-top: 1px solid var(--separator); }

@@ -2,8 +2,8 @@
 
 Lern-App zur Vorbereitung auf die IHK-Fortbildungsprüfung **Geprüfte/r Fachwirt/in für
 Logistiksysteme**. 250 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort sowie
-30 Rechenaufgaben zu Kennzahlen mit angezeigter Formel, verteilt auf die vier
-Handlungsbereiche der Prüfung.
+40 mehrschrittige Rechenaufgaben im Prüfungsformat mit angezeigten Formeln, verteilt
+auf die vier Handlungsbereiche der Prüfung.
 
 Die Oberfläche folgt den iOS-Mustern – Systemschrift, gruppierte Listen, Segmented
 Controls und die Systemfarben für hell und dunkel –, damit sie sich als
@@ -66,7 +66,7 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 | Lernmodus | Auflösung und Erläuterung direkt nach jeder Frage |
 | Prüfungssimulation | auf Zeit (90 Sekunden je Frage), Auswertung erst am Ende |
 | Fehlerspeicher | nur Fragen, die zuletzt falsch beantwortet wurden |
-| Rechentrainer | Kennzahlen und Formeln mit immer neuen Zahlen, Formel wird angezeigt |
+| Rechentrainer | Verbundaufgaben im Prüfungsformat mit Teilaufgaben und immer neuen Zahlen |
 
 **Weiteres**
 
@@ -90,22 +90,34 @@ oder ein anderes Gerät verwendet wird.
 
 ## Rechentrainer
 
-30 Kennzahlen und Formeln als Rechenaufgaben, die bei jedem Aufruf **neue Zahlen**
-erzeugen – geübt wird der Rechenweg, nicht das Ergebnis. Abgedeckt sind unter anderem
-Meldebestand, optimale Bestellmenge nach Andler, Break-even-Menge, Umschlagshäufigkeit,
-Lagerdauer, Lagerzinssatz und Lagerzinsen, Lagerreichweite, Taktzeit, OEE, Nettobedarf,
-Bezugspreis, Deckungsbeitrag, Amortisationsdauer, frachtpflichtiges Gewicht in der
-Luftfracht, Auslastungsgrad, Kosten je Tonnenkilometer, Termintreue, ppm-Fehlerquote
-sowie Personalbedarf, Fehlzeiten- und Fluktuationsquote.
+40 Verbundaufgaben mit insgesamt 153 Teilaufgaben und 135 Formeln, aufgebaut wie die
+Aufgaben der schriftlichen Prüfung:
 
-Die Aufgaben sind wie in der Prüfung **situationsbezogen** aufgebaut: zuerst eine
-Ausgangssituation von drei bis vier Sätzen mit Unternehmen, Anlass und
-Rahmenbedingungen, darunter hervorgehoben der Arbeitsauftrag (*Ermitteln Sie …*,
-*Berechnen Sie …*), darunter die gegebenen Werte als Liste.
+1. **Ausgangssituation** über mehrere Sätze mit Unternehmen, Anlass und
+   Rahmenbedingungen (500 bis 700 Zeichen)
+2. **Formeln**, die für die Lösung gebraucht werden – auf Wunsch ausblendbar
+3. **Gegebene Werte** als Liste
+4. **Teilaufgaben a), b), c) …**, die aufeinander aufbauen, mit eigener Eingabe je
+   Teilaufgabe
 
-Zu jeder Aufgabe steht die benötigte **Formel** über der Aufgabenstellung; sie lässt
-sich mit einem Tippen ausblenden, wer sich selbst prüfen will. Nach dem Prüfen
-erscheinen die richtige Lösung und der vollständige Rechenweg Schritt für Schritt.
+Bei jedem Aufruf werden **neue Zahlen** erzeugt – geübt wird der Rechenweg, nicht das
+Ergebnis. Nach dem Prüfen wird jede Teilaufgabe einzeln als richtig oder falsch
+markiert und mit Lösung und vollständigem Rechenweg aufgelöst. Als gelöst zählt eine
+Aufgabe nur, wenn alle Teilaufgaben stimmen.
+
+### Abgedeckte Formelbereiche
+
+| Bereich | Formeln |
+|---|---|
+| Bestand und Lager | durchschnittlicher Lagerbestand, Umschlagshäufigkeit, Lagerdauer, Lagerzinssatz, Lagerzinsen, Lagerreichweite, Meldebestand, Sicherheits- und Höchstbestand, Fehlmengenkosten |
+| Beschaffung | optimale Bestellmenge nach Andler, Bestellhäufigkeit, Bezugspreis, Angebotsvergleich, Lieferantenbewertung mit Punktbewertung, ABC-Wertanteil |
+| Kalkulation | Zuschlagskalkulation, Vorwärtskalkulation bis zum Listenverkaufspreis, Maschinenstundensatz, kalkulatorische Abschreibung und Zinsen, Prozesskostenrechnung, Deckungsbeitrag, Break-even |
+| Investition und Finanzierung | Kostenvergleich mit kritischer Menge, Kapitalwert, Amortisation, Make-or-Buy, Skontoausnutzung und Lieferantenkredit, Bilanz- und Liquiditätskennzahlen, Cashflow, ROI |
+| Produktion | Taktzeit und Linienauslegung, optimale Losgröße, Kanban-Regelkreis, Stücklistenauflösung mit Ausschuss, Nettobedarf, Trichterformel, OEE mit Einzelfaktoren |
+| Lager und Transport | Stellplatz- und Flächenbedarf, Flächennutzungsgrad, Lademeter, Fahrzeugbedarf, Auslastungsgrad, Kosten je Tonnenkilometer und je Sendung, Luftfracht-Volumengewicht |
+| Außenhandel | Zollwert, Zoll, Einfuhrumsatzsteuer, Wechselkursumrechnung im Global Sourcing, Umsatzsteuer-Zahllast |
+| Personal | Personalbedarf aus Arbeitsvolumen, Nettopersonalbedarf, Schichtbesetzung, Personalkosten je produktiver Stunde, Fehlzeiten- und Fluktuationsquote |
+| Qualität und Service | Lieferbereitschaftsgrad, Termintreue, OTIF, ppm-Fehlerquote, Qualitätskosten und Zehnerregel, Kommissionierleistung, CO2-Bilanz |
 
 Die Eingabe wird deutsch gelesen: Nachkommastellen mit Komma. Geprüft wird mit einer
 kleinen Toleranz, damit Zwischenrundungen nicht als Fehler zählen. Rechenaufgaben
@@ -114,40 +126,37 @@ zählen wie Fragen in den Lernfortschritt ihres Handlungsbereichs.
 ### Eine Rechenaufgabe ergänzen
 
 Vorlagen stehen in `data/formulas.js`. `make()` erzeugt bei jedem Aufruf einen neuen
-Satz Zahlen und liefert Aufgabentext, Angaben, Lösung und Rechenweg:
+Satz Zahlen und liefert Situation, gegebene Werte und die Teilaufgaben:
 
 ```js
 {
-  id: "RCH-31",                 // dauerhafte Kennung, NIE ändern
-  cat: "ums",                   // Handlungsbereich
-  topic: "Logistikcontrolling",
-  name: "Umschlagshäufigkeit",
-  formula: "Umschlagshäufigkeit = Wareneinsatz ÷ durchschnittlicher Lagerbestand",
-  unit: "Umschläge je Jahr",
-  decimals: 1,                  // erwartete Nachkommastellen
-  tol: 2,                       // optional: eigene Toleranz statt der abgeleiteten
+  id:       "RB-41",              // dauerhafte Kennung, NIE ändern
+  cat:      "ums",                // Handlungsbereich
+  topic:    "Logistikcontrolling",
+  name:     "Bestandsanalyse einer Warengruppe",
+  formulas: ["Umschlagshäufigkeit = Wareneinsatz ÷ durchschnittlicher Lagerbestand",
+             "Durchschnittliche Lagerdauer = 360 ÷ Umschlagshäufigkeit"],
   make: function () {
-    var uh = ri(4, 14), bestand = ri(15, 45) * 10000;
+    var uh = pick([4, 5, 6, 8]), bestand = ri(15, 45) * 10000;
     return {
-      text:  "Die Nordfracht Logistik GmbH betreibt ein Zentrallager … " +
-             "Wareneinsatz und durchschnittlicher Lagerbestand liegen vor.",
-      ask:   "Ermitteln Sie die Umschlagshäufigkeit.",
+      text:  "Die … GmbH betreibt … (mehrere Sätze Ausgangssituation)",
       given: [["Wareneinsatz im Jahr", eur(uh * bestand)],
               ["Durchschnittlicher Lagerbestand", eur(bestand)]],
-      value: uh,                          // exakte Lösung
-      steps: ["… = " + nf(uh, 1)]         // Rechenweg, Schritt für Schritt
+      parts: [
+        { ask: "Ermitteln Sie die Umschlagshäufigkeit.", unit: "Umschläge je Jahr",
+          decimals: 1, value: uh, steps: ["… = " + nf(uh, 1)] },
+        { ask: "Berechnen Sie die durchschnittliche Lagerdauer.", unit: "Tage",
+          decimals: 0, value: 360 / uh, tol: 1, steps: ["360 ÷ … "] }
+      ]
     };
   }
 }
 ```
 
-Schreibe `text` als Ausgangssituation über drei bis vier Sätze mit Unternehmen und
-Anlass und `ask` als einzelnen Arbeitsauftrag – so ist der Aufbau der Prüfung.
-
-Wähle die Zufallswerte so, dass sich ein sauberes Ergebnis einstellt – am besten das
-Ergebnis zuerst ziehen und die Angaben daraus ableiten (oben: `uh` zuerst, der
-Wareneinsatz folgt daraus). Achte darauf, dass keine negativen oder sinnlosen Werte
-entstehen können.
+Wähle die Zufallswerte so, dass sich saubere Ergebnisse einstellen – am besten das
+Ergebnis zuerst ziehen und die gegebenen Werte daraus ableiten. Achte darauf, dass
+keine negativen oder sinnlosen Zwischenwerte entstehen können; ein Fuzz-Lauf über
+alle Vorlagen deckt das zuverlässig auf.
 
 ## Handlungsbereiche
 

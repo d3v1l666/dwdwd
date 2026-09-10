@@ -282,8 +282,12 @@
   function makeItems(list) {
     return list.map(function (x) {
       if (x.make) {                       // Rechenvorlage: Zahlen jetzt erzeugen
+        var task = x.make();
         return {
-          calc: true, f: x, task: x.make(), input: "", checked: false, correct: null,
+          calc: true, f: x, task: task,
+          inputs: task.parts.map(function () { return ""; }),
+          hits: task.parts.map(function () { return null; }),
+          checked: false, correct: null,
           q: { id: x.id, cat: x.cat, topic: x.topic, q: x.name }
         };
       }
@@ -311,12 +315,22 @@
     return out.filter(function (n) { return isFinite(n); });
   }
 
+  function partHit(part, input) {
+    var tol = part.tol !== undefined
+      ? part.tol
+      : Math.max(0.5 * Math.pow(10, -part.decimals), Math.abs(part.value) * 0.001);
+    return readNumbers(input).some(function (n) { return Math.abs(n - part.value) <= tol; });
+  }
+
+  /* Eine Aufgabe zählt nur als richtig, wenn alle Teilaufgaben stimmen –
+     die einzelnen Treffer werden trotzdem angezeigt. */
   function checkCalc(it) {
-    var soll = it.task.value;
-    var tol = it.f.tol !== undefined
-      ? it.f.tol
-      : Math.max(0.5 * Math.pow(10, -it.f.decimals), Math.abs(soll) * 0.001);
-    return readNumbers(it.input).some(function (n) { return Math.abs(n - soll) <= tol; });
+    it.hits = it.task.parts.map(function (part, i) { return partHit(part, it.inputs[i]); });
+    return it.hits.every(function (h) { return h; });
+  }
+
+  function calcReady(it) {
+    return it.inputs.every(function (v) { return readNumbers(v).length > 0; });
   }
 
   function startRun() {
@@ -387,7 +401,7 @@
     var it = current();
 
     if (it.calc) {
-      if (!readNumbers(it.input).length) return;
+      if (!calcReady(it)) return;
       if (!it.checked) {
         it.checked = true;
         it.correct = checkCalc(it);
@@ -631,22 +645,27 @@
 
     h.push('<div class="q-cat">' + esc(c.code + " · " + c.short) + "</div>");
     h.push('<h2 class="q-text">' + esc(f.name) + "</h2>");
-    h.push('<p class="q-hint">' + esc(f.topic) + " · Ergebnis auf " +
-      (f.decimals === 0 ? "volle " + esc(f.unit) : f.decimals + " Nachkommastellen") + "</p>");
+    h.push('<p class="q-hint">' + esc(f.topic) + " · " + t.parts.length + " " +
+      plural(t.parts.length, "Teilaufgabe", "Teilaufgaben") + "</p>");
 
     h.push('<div class="section">');
-    h.push(groupHead("Formel", { act: "formula", label: state.showFormula ? "Ausblenden" : "Einblenden" }));
+    h.push(groupHead("Ausgangssituation"));
+    h.push('<div class="group"><div class="task-text">' + esc(t.text) + "</div></div></div>");
+
+    h.push('<div class="section">');
+    h.push(groupHead("Formeln", { act: "formula", label: state.showFormula ? "Ausblenden" : "Einblenden" }));
     if (state.showFormula) {
-      h.push('<div class="group"><div class="formula">' + esc(f.formula) + "</div></div>");
+      h.push('<div class="group">');
+      f.formulas.forEach(function (fm) { h.push('<div class="formula">' + esc(fm) + "</div>"); });
+      h.push("</div>");
     } else {
-      h.push('<div class="group-foot">Ausgeblendet – erst rechnen, dann bei Bedarf einblenden.</div>');
+      h.push('<div class="group-foot">Ausgeblendet – erst selbst rechnen, dann bei Bedarf einblenden.</div>');
     }
     h.push("</div>");
 
     h.push('<div class="section">');
-    h.push(groupHead("Aufgabe"));
-    h.push('<div class="group"><div class="task-text">' + esc(t.text) + "</div>");
-    if (t.ask) h.push('<div class="task-ask">' + esc(t.ask) + "</div>");
+    h.push(groupHead("Gegeben"));
+    h.push('<div class="group">');
     t.given.forEach(function (g) {
       h.push('<div class="row"><span class="row-main"><span class="row-title">' + esc(g[0]) +
         '</span></span><span class="row-value">' + esc(g[1]) + "</span></div>");
@@ -654,32 +673,48 @@
     h.push("</div></div>");
 
     h.push('<div class="section">');
-    h.push(groupHead("Dein Ergebnis"));
-    h.push('<div class="group"><div class="numfield">');
-    h.push('<input id="calcInput" type="text" inputmode="decimal" autocomplete="off" ' +
-      'placeholder="0" aria-label="Ergebnis" value="' + esc(it.input) + '"' +
-      (it.checked ? " disabled" : "") + ">");
-    h.push('<span class="unit">' + esc(f.unit) + "</span>");
-    h.push("</div></div>");
-    h.push('<div class="group-foot">Nachkommastellen mit Komma eingeben.</div>');
+    h.push(groupHead("Teilaufgaben"));
+    h.push('<div class="group">');
+    t.parts.forEach(function (part, i) {
+      var hit = it.checked ? it.hits[i] : null;
+      h.push('<div class="part">');
+      h.push('<div class="part-head"><b class="part-key">' + "abcdefgh".charAt(i) + ")</b> " +
+        esc(part.ask) + "</div>");
+      h.push('<div class="numfield">');
+      h.push('<input id="calc' + i + '" data-i="' + i + '" type="text" inputmode="decimal" ' +
+        'autocomplete="off" placeholder="0" aria-label="Ergebnis ' + "abcdefgh".charAt(i) + '" value="' +
+        esc(it.inputs[i]) + '"' + (it.checked ? " disabled" : "") + ">");
+      if (part.unit) h.push('<span class="unit">' + esc(part.unit) + "</span>");
+      h.push("</div>");
+      if (it.checked) {
+        h.push('<div class="part-result ' + (hit ? "ok" : "no") + '">' +
+          (hit ? "✓ Richtig" : "✕ Falsch") + " · Lösung: " +
+          esc(nf(part.value, part.decimals) + (part.unit ? " " + part.unit : "")) + "</div>");
+        h.push('<ol class="steps">');
+        part.steps.forEach(function (st) { h.push("<li>" + esc(st) + "</li>"); });
+        h.push("</ol>");
+      }
+      h.push("</div>");
+    });
+    h.push("</div>");
+    h.push('<div class="group-foot">Nachkommastellen mit Komma. Alle Teilaufgaben ausfüllen, ' +
+      "dann gemeinsam prüfen.</div>");
     h.push("</div>");
 
     if (it.checked) {
+      var richtig = it.hits.filter(function (x) { return x; }).length;
       h.push('<div class="section"><div class="group">');
       h.push('<div class="verdict ' + (it.correct ? "ok" : "no") + '">' +
-        (it.correct ? "✓ Richtig" : "✕ Falsch") + "</div>");
-      h.push('<div class="result-line">Richtige Lösung: <b>' +
-        esc(nf(t.value, f.decimals) + " " + f.unit) + "</b></div>");
-      h.push('<ol class="steps">');
-      t.steps.forEach(function (st) { h.push("<li>" + esc(st) + "</li>"); });
-      h.push("</ol></div></div>");
+        (it.correct ? "✓ Aufgabe vollständig gelöst" : "✕ " + richtig + " von " + it.hits.length + " richtig") +
+        "</div>");
+      h.push("</div></div>");
     }
 
     h.push('<button class="btn" id="submitBtn" data-act="submit"' +
-      (readNumbers(it.input).length ? "" : " disabled") + ">" +
+      (calcReady(it) ? "" : " disabled") + ">" +
       (it.checked
         ? (run.i === run.items.length - 1 ? "Runde auswerten" : "Nächste Aufgabe")
-        : "Ergebnis prüfen") + "</button>");
+        : "Ergebnisse prüfen") + "</button>");
     return h.join("");
   }
 
@@ -741,14 +776,17 @@
         h.push('<details class="row-details"><summary><span class="chevron">›</span><span>' +
           esc(q.q) + "</span></summary><div class=\"detail-body\">");
         if (it.calc) {
-          h.push('<p class="detail-line no"><span class="detail-label">Deine Eingabe</span>' +
-            (it.input ? esc(it.input) + " " + esc(it.f.unit) : "keine Eingabe") + "</p>");
-          h.push('<p class="detail-line ok"><span class="detail-label">Richtig</span>' +
-            esc(nf(it.task.value, it.f.decimals) + " " + it.f.unit) + "</p>");
-          h.push('<p class="detail-line"><span class="detail-label">Formel</span>' + esc(it.f.formula) + "</p>");
-          h.push('<ol class="steps">');
-          it.task.steps.forEach(function (st) { h.push("<li>" + esc(st) + "</li>"); });
-          h.push("</ol>");
+          it.task.parts.forEach(function (part, i) {
+            h.push('<p class="detail-line ' + (it.hits[i] ? "ok" : "no") + '">' +
+              '<span class="detail-label">' + "abcdefgh".charAt(i) + ") " + esc(part.ask) + "</span>" +
+              (it.inputs[i] ? esc(it.inputs[i]) : "keine Eingabe") + " · Lösung: " +
+              esc(nf(part.value, part.decimals) + (part.unit ? " " + part.unit : "")) + "</p>");
+            if (!it.hits[i]) {
+              h.push('<ol class="steps">');
+              part.steps.forEach(function (st) { h.push("<li>" + esc(st) + "</li>"); });
+              h.push("</ol>");
+            }
+          });
         } else {
           var chosen = it.picked.map(function (d) { return q.a[it.order[d]]; });
           var rights = q.c.map(function (i) { return q.a[i]; });
@@ -892,10 +930,13 @@
   });
 
   document.addEventListener("input", function (ev) {
-    if (ev.target.id !== "calcInput" || !run) return;
-    current().input = ev.target.value;
+    var i = ev.target.getAttribute && ev.target.getAttribute("data-i");
+    if (i === null || i === undefined || !run) return;
+    var it = current();
+    if (!it.calc) return;
+    it.inputs[parseInt(i, 10)] = ev.target.value;
     var btn = document.getElementById("submitBtn");
-    if (btn) btn.disabled = !readNumbers(ev.target.value).length;
+    if (btn) btn.disabled = !calcReady(it);
   });
 
   document.addEventListener("change", function (ev) {
@@ -904,7 +945,9 @@
 
   document.addEventListener("keydown", function (ev) {
     if (screen !== "quiz") return;
-    if (ev.key === "Enter" && ev.target.id === "calcInput") { ev.preventDefault(); submit(); return; }
+    if (ev.key === "Enter" && ev.target.tagName === "INPUT" && current().calc) {
+      ev.preventDefault(); submit(); return;
+    }
     if (ev.target.tagName === "INPUT") return;
     if (current().calc) {
       if (ev.key === "Enter") { ev.preventDefault(); submit(); }
