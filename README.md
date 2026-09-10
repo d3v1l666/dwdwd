@@ -149,6 +149,12 @@ Die Schaltfläche **In Teilaufgabe … übernehmen** schreibt das angezeigte Erg
 direkt in das zuletzt berührte Eingabefeld und schließt den Rechner. Welches Feld
 gemeint ist, steht auf der Schaltfläche.
 
+Symbol und Tastenfeld erscheinen ausschließlich während einer laufenden Rechenrunde
+und räumen sich beim Verlassen selbst ab. Auf allen Bedienelementen ist das
+Doppeltipp-Zoom von iOS abgeschaltet (`touch-action: manipulation`), damit schnelles
+Tippen auf dieselbe Taste die Seite nicht vergrößert; der Zwei-Finger-Zoom bleibt
+erhalten.
+
 ### Eine Rechenaufgabe ergänzen
 
 Vorlagen stehen in `data/formulas.js`. `make()` erzeugt bei jedem Aufruf einen neuen

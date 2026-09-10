@@ -794,3 +794,19 @@ body.calc-open #app { padding-bottom: calc(430px + env(safe-area-inset-bottom));
   .calc-key { padding: 11px 0; font-size: 20px; }
   body.calc-open #app { padding-bottom: calc(370px + env(safe-area-inset-bottom)); }
 }
+
+/* Doppeltippen auf Bedienelementen soll nicht hineinzoomen – beim schnellen
+   Tippen auf dieselbe Taste löste iOS sonst den Zoom aus. Zwei-Finger-Zoom
+   bleibt erhalten. */
+button,
+input,
+select,
+textarea,
+.tabbar,
+.calc-panel,
+.calc-fab,
+.row,
+.answer,
+details summary {
+  touch-action: manipulation;
+}

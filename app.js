@@ -985,7 +985,17 @@
   function calcShow(n) {
     if (!isFinite(n)) return "Fehler";
     if (Math.abs(n) >= 1e15) return n.toExponential(6).replace(".", ",");
-    return n.toLocaleString("de-DE", { maximumFractionDigits: 8 });
+    return n.toLocaleString("de-DE", { maximumFractionDigits: 8, useGrouping: false });
+  }
+
+  /* Tausenderpunkte nur für die Anzeige, damit lange Zahlen lesbar bleiben. */
+  function calcGrouped(str) {
+    if (str === "Fehler" || str.indexOf("e") !== -1) return str;
+    var neg = str.charAt(0) === "-";
+    var rest = neg ? str.slice(1) : str;
+    var teile = rest.split(",");
+    var ganz = teile[0].replace(/\./g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    return (neg ? "-" : "") + ganz + (teile.length > 1 ? "," + teile[1] : "");
   }
 
   function calcApply() {
@@ -1032,9 +1042,10 @@
     if (!run || !current().calc || current().checked) return;
     var it = current();
     var i = Math.min(calc.target, it.inputs.length - 1);
-    it.inputs[i] = calc.display;
+    var wert = calcGrouped(calc.display);
+    it.inputs[i] = wert;
     var field = document.getElementById("calc" + i);
-    if (field) field.value = calc.display;
+    if (field) field.value = wert;
     var btn = document.getElementById("submitBtn");
     if (btn) btn.disabled = !calcReady(it);
     calc.open = false;
@@ -1048,7 +1059,12 @@
       host.id = "calcpad";
       document.body.appendChild(host);
     }
-    if (!(screen === "quiz" && run && current().calc)) { host.innerHTML = ""; return; }
+    if (!(screen === "quiz" && run && current().calc)) {
+      host.innerHTML = "";
+      calc.open = false;
+      document.body.classList.remove("calc-open");
+      return;
+    }
 
     var h = [];
     if (!calc.open) {
@@ -1060,7 +1076,7 @@
       h.push('<div class="calc-panel" role="dialog" aria-label="Taschenrechner">');
       h.push('<div class="calc-bar"><span class="calc-title">Rechner</span>' +
         '<button class="calc-close" data-act="calc-close" aria-label="Schließen">Fertig</button></div>');
-      h.push('<div class="calc-display tnum">' + esc(calc.display) + "</div>");
+      h.push('<div class="calc-display tnum">' + esc(calcGrouped(calc.display)) + "</div>");
       h.push('<div class="calc-keys">');
       KEYPAD.forEach(function (k) {
         var wide = k[0] === "0" ? " wide" : "";
@@ -1187,9 +1203,10 @@
     el.innerHTML = screen === "quiz"
       ? (current().calc ? calcScreen() : quizScreen())
       : screen === "result" ? resultScreen() : setupScreen();
+    var imRechnen = screen === "quiz" && !!run && current().calc;
     document.body.classList.toggle("has-tabbar", screen === "setup");
-    document.body.classList.toggle("has-calc", screen === "quiz" && current().calc);
-    if (screen === "quiz" && current().calc) renderCalculator();
+    document.body.classList.toggle("has-calc", imRechnen);
+    renderCalculator();   // räumt sich außerhalb des Rechenmoduls selbst ab
     window.scrollTo(0, keepScroll ? y : 0);
   }
 
