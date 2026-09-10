@@ -57,6 +57,20 @@ branch** mit dem Branch `claude/fachwirt-logistik-exam-app-y5z8io` und dem Ordne
 Nach Änderungen an Fragen oder Programmteilen genügt ein Push; der Service Worker
 holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächsten Start.
 
+## Module
+
+Die App gliedert sich über eine Leiste am unteren Rand in drei Module:
+
+| Modul | Inhalt |
+|---|---|
+| **Fragen** | Multiple-Choice-Training mit Lernmodus, Prüfungssimulation und Fehlerspeicher |
+| **Rechnen** | Verbundaufgaben im Prüfungsformat mit eigenem Fortschritt und eingebautem Rechner |
+| **Mehr** | Prüfungstermin, Gesamtfortschritt, Darstellung, Zurücksetzen |
+
+Umfang und Handlungsbereiche werden **je Modul getrennt** gewählt und gespeichert.
+Wer im Rechenmodul nur HB2 üben will, verändert damit nicht die Auswahl im
+Fragenmodul. Während einer laufenden Runde blendet sich die Modul-Leiste aus.
+
 ## Was die App kann
 
 **Drei Modi**
@@ -122,6 +136,18 @@ Aufgabe nur, wenn alle Teilaufgaben stimmen.
 Die Eingabe wird deutsch gelesen: Nachkommastellen mit Komma. Geprüft wird mit einer
 kleinen Toleranz, damit Zwischenrundungen nicht als Fehler zählen. Rechenaufgaben
 zählen wie Fragen in den Lernfortschritt ihres Handlungsbereichs.
+
+### Eingebauter Taschenrechner
+
+Während einer Rechenrunde liegt unten rechts ein Taschenrechner-Symbol. Ein Tippen
+öffnet ein Tastenfeld am unteren Rand, ein weiteres schließt es wieder. Der Rechner
+arbeitet mit Sofortausführung wie der Taschenrechner des Telefons und beherrscht die
+vier Grundrechenarten, Prozent, Rückschritt und AC. Die Anzeige verwendet deutsche
+Schreibweise mit Komma.
+
+Die Schaltfläche **In Teilaufgabe … übernehmen** schreibt das angezeigte Ergebnis
+direkt in das zuletzt berührte Eingabefeld und schließt den Rechner. Welches Feld
+gemeint ist, steht auf der Schaltfläche.
 
 ### Eine Rechenaufgabe ergänzen
 

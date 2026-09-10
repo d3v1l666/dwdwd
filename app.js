@@ -20,9 +20,41 @@
     pruefung: { tab: "Prüfung", name: "Prüfungssimulation",
                 desc: "Auf Zeit, Auswertung erst am Ende. 90 Sekunden je Frage." },
     fehler:   { tab: "Fehler",  name: "Fehlerspeicher",
-                desc: "Nur Fragen, die zuletzt falsch beantwortet wurden." },
-    rechnen:  { tab: "Rechnen", name: "Rechentrainer", calc: true,
-                desc: "Kennzahlen und Formeln mit immer neuen Zahlen. Die Formel steht dabei." }
+                desc: "Nur Fragen, die zuletzt falsch beantwortet wurden." }
+  };
+
+  /* Der Rechentrainer ist ein eigenes Modul mit eigener Auswahl, kein Modus. */
+  var CALC_RUN = "rechnen";
+  function runName(m) { return MODES[m] ? MODES[m].name : "Rechentrainer"; }
+  function isCalcMode(m) { return m === CALC_RUN; }
+
+  var TABS = [
+    { id: "fragen",  label: "Fragen" },
+    { id: "rechnen", label: "Rechnen" },
+    { id: "mehr",    label: "Mehr" }
+  ];
+
+  var ICONS = {
+    fragen: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round"><line x1="9" y1="6.5" x2="20" y2="6.5"/>' +
+      '<line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="17.5" x2="20" y2="17.5"/>' +
+      '<circle cx="4.6" cy="6.5" r="1.5"/><circle cx="4.6" cy="12" r="1.5"/><circle cx="4.6" cy="17.5" r="1.5"/></svg>',
+    rechnen: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round"><rect x="5" y="2.6" width="14" height="18.8" rx="3"/>' +
+      '<line x1="8.6" y1="6.6" x2="15.4" y2="6.6"/>' +
+      '<circle cx="9" cy="11" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="12" cy="11" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="15" cy="11" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="9" cy="14.6" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="12" cy="14.6" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="15" cy="14.6" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="9" cy="18.2" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="12" cy="18.2" r="1" fill="currentColor" stroke="none"/>' +
+      '<circle cx="15" cy="18.2" r="1" fill="currentColor" stroke="none"/></svg>',
+    mehr: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/>' +
+      '<path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M2.8 12h2.4M18.8 12h2.4' +
+      'M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/></svg>'
   };
 
   /* IHK-Bewertungsschlüssel */
@@ -57,9 +89,12 @@
     theme: "",
     showFormula: true,
     examDate: nextSpringDate(),
+    tab: "fragen",
     mode: "lernen",
     size: 20,
     cats: CATEGORIES.map(function (c) { return c.id; }),
+    calcSize: 5,
+    calcCats: CATEGORIES.map(function (c) { return c.id; }),
     stats: {}
   };
 
@@ -92,6 +127,8 @@
     if (MODES[settings.mode]) state.mode = settings.mode;
     if (typeof settings.showFormula === "boolean") state.showFormula = settings.showFormula;
     if ([0, 10, 20, 40].indexOf(settings.size) !== -1) state.size = settings.size;
+    if ([0, 3, 5, 10].indexOf(settings.calcSize) !== -1) state.calcSize = settings.calcSize;
+    for (var t = 0; t < TABS.length; t++) if (TABS[t].id === settings.tab) state.tab = settings.tab;
 
     /* Nach einer Umbenennung der Handlungsbereiche zeigt die gespeicherte
        Auswahl ins Leere. Unbekanntes wird verworfen; bleibt nichts übrig,
@@ -100,6 +137,10 @@
     if (Array.isArray(settings.cats)) {
       var keep = settings.cats.filter(function (id) { return known.indexOf(id) !== -1; });
       state.cats = keep.length ? keep : known.slice();
+    }
+    if (Array.isArray(settings.calcCats)) {
+      var keepC = settings.calcCats.filter(function (id) { return known.indexOf(id) !== -1; });
+      state.calcCats = keepC.length ? keepC : known.slice();
     }
 
     /* Der Lernfortschritt hängt an der unveränderlichen Fragekennung, nicht an
@@ -138,7 +179,8 @@
         schema: SCHEMA,
         settings: {
           theme: state.theme, examDate: state.examDate, showFormula: state.showFormula,
-          mode: state.mode, size: state.size, cats: state.cats
+          tab: state.tab, mode: state.mode, size: state.size, cats: state.cats,
+          calcSize: state.calcSize, calcCats: state.calcCats
         },
         stats: state.stats
       }));
@@ -176,12 +218,13 @@
 
   function inCat(id) { return QUESTIONS.filter(function (q) { return q.cat === id; }); }
   function formulasInCat(id) { return FORMULAS.filter(function (f) { return f.cat === id; }); }
-  function isCalcMode(m) { return !!MODES[m].calc; }
 
   /* Aus den Fragestatistiken abgeleitet, nie getrennt gespeichert – dadurch
      kann der Bereichsfortschritt nicht von den Fragedaten abweichen. */
-  function catProgress(id) {
-    var qs = inCat(id).concat(formulasInCat(id));   // Fragen und Rechenaufgaben zusammen
+  function catProgress(id, kind) {
+    var qs = kind === "calc" ? formulasInCat(id)
+           : kind === "q" ? inCat(id)
+           : inCat(id).concat(formulasInCat(id));
     var mastered = 0, right = 0, answered = 0, seen = 0;
     qs.forEach(function (q) {
       var st = statOf(q.id);
@@ -272,11 +315,13 @@
   var screen = "setup";
   var tick = null;
 
-  function poolForRun() {
-    var source = isCalcMode(state.mode) ? FORMULAS : QUESTIONS;
-    var pool = source.filter(function (x) { return state.cats.indexOf(x.cat) !== -1; });
+  function questionPool() {
+    var pool = QUESTIONS.filter(function (q) { return state.cats.indexOf(q.cat) !== -1; });
     if (state.mode === "fehler") pool = pool.filter(function (q) { return isWeak(q.id); });
     return pool;
+  }
+  function calcPool() {
+    return FORMULAS.filter(function (f) { return state.calcCats.indexOf(f.cat) !== -1; });
   }
 
   function makeItems(list) {
@@ -334,7 +379,7 @@
   }
 
   function startRun() {
-    var pool = shuffle(poolForRun());
+    var pool = shuffle(questionPool());
     if (!pool.length) return;
     if (state.size > 0) pool = pool.slice(0, state.size);
 
@@ -343,6 +388,15 @@
       run.deadline = Date.now() + run.items.length * 90000;
       startTimer();
     }
+    screen = "quiz";
+    render();
+  }
+
+  function startCalcRun() {
+    var pool = shuffle(calcPool());
+    if (!pool.length) return;
+    if (state.calcSize > 0) pool = pool.slice(0, state.calcSize);
+    run = { mode: CALC_RUN, items: makeItems(pool), i: 0, deadline: 0 };
     screen = "quiz";
     render();
   }
@@ -437,8 +491,8 @@
     else finishRun();
   }
 
-  function finishRun() { stopTimer(); screen = "result"; render(); }
-  function abortRun() { stopTimer(); run = null; screen = "setup"; render(); }
+  function finishRun() { stopTimer(); calc.open = false; screen = "result"; render(); }
+  function abortRun() { stopTimer(); calc.open = false; run = null; screen = "setup"; render(); }
 
   function retryWrong() {
     var wrong = run.items.filter(function (it) { return it.checked && !it.correct; });
@@ -455,41 +509,77 @@
 
   /* ---------------- Startseite ---------------- */
 
-  function setupScreen() {
-    var total = QUESTIONS.length;
-    var seen = 0, mastered = 0, right = 0, answered = 0;
-    QUESTIONS.concat(FORMULAS).forEach(function (q) {
-      var s = statOf(q.id);
-      if (s.seen) seen++;
-      if (isMastered(q.id)) mastered++;
-      right += s.right;
-      answered += s.seen;
+  function tabbar() {
+    var h = ['<nav class="tabbar"><div class="tabbar-inner">'];
+    TABS.forEach(function (t) {
+      h.push('<button class="tab" data-act="tab" data-v="' + t.id + '" aria-pressed="' +
+        (state.tab === t.id) + '">' + ICONS[t.id] + '<span>' + esc(t.label) + "</span></button>");
     });
-    var quote = answered ? Math.round(right / answered * 100) : 0;
+    h.push("</div></nav>");
+    return h.join("");
+  }
+
+  function catSection(kind) {
+    var calc = kind === "calc";
+    var chosen = calc ? state.calcCats : state.cats;
+    var h = ['<div class="section">'];
+    h.push(groupHead("Handlungsbereiche", {
+      act: calc ? "toggle-all-calc" : "toggle-all",
+      label: chosen.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen"
+    }));
+    h.push('<div class="group">');
+    CATEGORIES.forEach(function (c) {
+      var pr = catProgress(c.id, calc ? "calc" : "q");
+      var on = chosen.indexOf(c.id) !== -1;
+      h.push('<button class="row tap" data-act="' + (calc ? "calccat" : "cat") + '" data-v="' + c.id +
+        '" aria-pressed="' + on + '">');
+      h.push('<span class="row-main">');
+      h.push('<span class="row-title"><b class="hb">' + esc(c.code) + "</b> " + esc(c.name) + "</span>");
+      h.push('<span class="bar"><b style="width:' + pr.pct + '%"></b></span>');
+      h.push('<span class="row-sub" data-progress="' + c.id + '" data-kind="' + (calc ? "calc" : "q") +
+        '">' + esc(catProgressText(pr)) + "</span>");
+      h.push("</span>");
+      h.push('<span class="row-check">' + (on ? "✓" : "") + "</span>");
+      h.push("</button>");
+    });
+    h.push("</div></div>");
+    return h.join("");
+  }
+
+  function overall(list) {
+    var seen = 0, mastered = 0, right = 0, answered = 0;
+    list.forEach(function (q) {
+      var st = statOf(q.id);
+      if (st.seen) seen++;
+      if (isMastered(q.id)) mastered++;
+      right += st.right;
+      answered += st.seen;
+    });
+    return { total: list.length, seen: seen, mastered: mastered,
+             quote: answered ? Math.round(right / answered * 100) : 0 };
+  }
+
+  /* ---------------- Modul: Fragen ---------------- */
+
+  function fragenTab() {
+    var o = overall(QUESTIONS);
     var weak = QUESTIONS.filter(function (q) { return isWeak(q.id); }).length;
     var days = daysUntil(state.examDate);
-    var pool = poolForRun().length;
+    var pool = questionPool().length;
 
     var h = [];
-    h.push('<h1 class="large-title">Prüfungstrainer</h1>');
-    h.push('<p class="large-sub">Fachwirt für Logistiksysteme · ' + total +
-      " Fragen und " + FORMULAS.length + " Rechenaufgaben · " +
-      CATEGORIES.length + " Handlungsbereiche</p>");
+    h.push('<h1 class="large-title">Fragen</h1>');
+    h.push('<p class="large-sub">' + o.total + " Multiple-Choice-Fragen mit Erläuterung</p>");
 
     h.push('<div class="widget">');
     h.push('<div class="widget-num tnum" id="cdNum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
     h.push('<div class="widget-body"><div class="widget-title" id="cdTitle">' + esc(cdTitleText(days)) + "</div>");
-    h.push('<div class="widget-sub" id="cdSub">' + esc(cdSubText(days)) + "</div></div>");
-    h.push("</div>");
-    h.push('<div class="section"><div class="group"><div class="row">');
-    h.push('<span class="row-main"><span class="row-title">Prüfungstermin</span></span>');
-    h.push('<input type="date" id="examDate" value="' + esc(state.examDate) + '" aria-label="Prüfungstermin">');
-    h.push("</div></div></div>");
+    h.push('<div class="widget-sub" id="cdSub">' + esc(cdSubText(days)) + "</div></div></div>");
 
     h.push('<div class="tiles">');
-    h.push(tile(seen + " / " + (total + FORMULAS.length), "Aufgaben bearbeitet"));
-    h.push(tile(quote + " %", "Trefferquote"));
-    h.push(tile(String(mastered), "sicher beherrscht"));
+    h.push(tile(o.seen + " / " + o.total, "Fragen bearbeitet"));
+    h.push(tile(o.quote + " %", "Trefferquote"));
+    h.push(tile(String(o.mastered), "sicher beherrscht"));
     h.push(tile(String(weak), "im Fehlerspeicher"));
     h.push("</div>");
 
@@ -510,33 +600,89 @@
     h.push('<div class="group-foot" id="sizeFoot">' + esc(poolFootText(pool)) + "</div>");
     h.push("</div>");
 
-    h.push('<div class="section">');
-    h.push(groupHead("Handlungsbereiche", {
-      act: "toggle-all",
-      label: state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen"
-    }));
-    h.push('<div class="group">');
-    CATEGORIES.forEach(function (c) {
-      var pr = catProgress(c.id);
-      var on = state.cats.indexOf(c.id) !== -1;
-      h.push('<button class="row tap" data-act="cat" data-v="' + c.id + '" aria-pressed="' + on + '">');
-      h.push('<span class="row-main">');
-      h.push('<span class="row-title"><b class="hb">' + esc(c.code) + "</b> " + esc(c.name) + "</span>");
-      h.push('<span class="bar"><b style="width:' + pr.pct + '%"></b></span>');
-      h.push('<span class="row-sub" data-progress="' + c.id + '">' + esc(catProgressText(pr)) + "</span>");
-      h.push("</span>");
-      h.push('<span class="row-check">' + (on ? "✓" : "") + "</span>");
-      h.push("</button>");
-    });
-    h.push("</div>");
-    h.push('<div class="group-foot">Der Balken zeigt, wie viele Fragen des Bereichs du sicher beherrschst, ' +
-      "also zweimal hintereinander richtig beantwortet hast.</div>");
+    h.push(catSection("q"));
+
+    h.push('<button class="btn" id="startBtn" data-act="start"' + (pool ? "" : " disabled") + ">" +
+      esc(startBtnText(pool)) + "</button>");
+    return h.join("");
+  }
+
+  /* ---------------- Modul: Rechnen ---------------- */
+
+  function rechnenTab() {
+    var o = overall(FORMULAS);
+    var teile = 0;
+    FORMULAS.forEach(function (f) { teile += f.make().parts.length; });
+    var pool = calcPool().length;
+
+    var h = [];
+    h.push('<h1 class="large-title">Rechnen</h1>');
+    h.push('<p class="large-sub">' + o.total + " Verbundaufgaben im Prüfungsformat · rund " + teile +
+      " Teilaufgaben · Zahlen werden bei jedem Aufruf neu erzeugt</p>");
+
+    h.push('<div class="tiles">');
+    h.push(tile(o.seen + " / " + o.total, "Aufgaben bearbeitet"));
+    h.push(tile(o.quote + " %", "vollständig gelöst"));
+    h.push(tile(String(o.mastered), "sicher beherrscht"));
+    h.push(tile(String(FORMULAS.reduce(function (a, f) { return a + f.formulas.length; }, 0)), "Formeln"));
     h.push("</div>");
 
     h.push('<div class="section">');
-    h.push('<button class="btn" id="startBtn" data-act="start"' + (pool ? "" : " disabled") + ">" +
-      esc(startBtnText(pool)) + "</button>");
+    h.push(groupHead("Aufgaben je Runde"));
+    h.push(segmented("calcsize", [
+      { v: "3", label: "3" }, { v: "5", label: "5" },
+      { v: "10", label: "10" }, { v: "0", label: "Alle" }
+    ], function (it) { return state.calcSize === parseInt(it.v, 10); }));
+    h.push('<div class="group-foot" id="calcSizeFoot">' + pool + " " +
+      plural(pool, "Aufgabe", "Aufgaben") + " in der aktuellen Auswahl. Jede Aufgabe hat mehrere " +
+      "Teilaufgaben, plane etwa fünf bis zehn Minuten je Aufgabe.</div>");
     h.push("</div>");
+
+    h.push('<div class="section">');
+    h.push(groupHead("Formeln"));
+    h.push('<div class="group">');
+    h.push('<button class="row tap" data-act="formula" aria-pressed="' + state.showFormula + '">');
+    h.push('<span class="row-main"><span class="row-title">Formeln in der Aufgabe anzeigen</span>');
+    h.push('<span class="row-sub">Ausschalten, wenn du die Formeln auswendig können willst</span></span>');
+    h.push('<span class="row-check">' + (state.showFormula ? "✓" : "") + "</span></button>");
+    h.push("</div></div>");
+
+    h.push(catSection("calc"));
+
+    h.push('<button class="btn" id="startCalcBtn" data-act="startcalc"' + (pool ? "" : " disabled") + ">" +
+      (pool ? "Rechenrunde starten" : "Bitte Handlungsbereich wählen") + "</button>");
+    return h.join("");
+  }
+
+  /* ---------------- Modul: Mehr ---------------- */
+
+  function mehrTab() {
+    var days = daysUntil(state.examDate);
+    var alles = overall(QUESTIONS.concat(FORMULAS));
+
+    var h = [];
+    h.push('<h1 class="large-title">Mehr</h1>');
+    h.push('<p class="large-sub">Prüfungstermin, Darstellung und Lernfortschritt</p>');
+
+    h.push('<div class="widget">');
+    h.push('<div class="widget-num tnum" id="cdNum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
+    h.push('<div class="widget-body"><div class="widget-title" id="cdTitle">' + esc(cdTitleText(days)) + "</div>");
+    h.push('<div class="widget-sub" id="cdSub">' + esc(cdSubText(days)) + "</div></div></div>");
+
+    h.push('<div class="section"><div class="group"><div class="row">');
+    h.push('<span class="row-main"><span class="row-title">Prüfungstermin</span></span>');
+    h.push('<input type="date" id="examDate" value="' + esc(state.examDate) + '" aria-label="Prüfungstermin">');
+    h.push("</div></div></div>");
+
+    h.push('<div class="section">');
+    h.push(groupHead("Gesamtfortschritt"));
+    h.push('<div class="group">');
+    [["Aufgaben insgesamt", alles.total], ["Davon bearbeitet", alles.seen],
+     ["Sicher beherrscht", alles.mastered], ["Trefferquote", alles.quote + " %"]].forEach(function (r) {
+      h.push('<div class="row"><span class="row-main"><span class="row-title">' + esc(r[0]) +
+        '</span></span><span class="row-value">' + esc(String(r[1])) + "</span></div>");
+    });
+    h.push("</div></div>");
 
     h.push('<div class="section">');
     h.push(groupHead("Darstellung"));
@@ -548,13 +694,19 @@
     h.push('<button class="row tap destructive row-pad" data-act="reset">Fortschritt zurücksetzen</button>');
     h.push("</div>");
     h.push('<div class="group-foot">Bei Mehrfachauswahl zählt eine Antwort nur, wenn genau alle richtigen ' +
-      'Aussagen angekreuzt sind. Die Notenstufen folgen dem IHK-Bewertungsschlüssel, bestanden ab 50 Prozent. ' +
-      'Die Fragen sind den vier Handlungsbereichen zugeordnet; jede trägt zusätzlich ihr Fachthema. ' +
-      'Gleiche den Zuschnitt mit dem Rahmenplan deiner Kammer ab. Der Fortschritt wird nur lokal in diesem ' +
-      'Browser gespeichert und übersteht Aktualisierungen der App.</div>');
+      'Aussagen angekreuzt sind; eine Rechenaufgabe gilt nur bei vollständig richtiger Bearbeitung als ' +
+      'gelöst. Die Notenstufen folgen dem IHK-Bewertungsschlüssel, bestanden ab 50 Prozent. Gleiche den ' +
+      'Zuschnitt der Handlungsbereiche mit dem Rahmenplan deiner Kammer ab. Der Fortschritt wird nur lokal ' +
+      'in diesem Browser gespeichert und übersteht Aktualisierungen der App.</div>');
     h.push("</div>");
-
     return h.join("");
+  }
+
+  function setupScreen() {
+    var body = state.tab === "rechnen" ? rechnenTab()
+             : state.tab === "mehr" ? mehrTab()
+             : fragenTab();
+    return body + tabbar();
   }
 
   function tile(num, label) {
@@ -736,7 +888,7 @@
 
     var h = [];
     h.push('<h1 class="large-title">Ergebnis</h1>');
-    h.push('<p class="large-sub">' + MODES[run.mode].name + " · " + done.length +
+    h.push('<p class="large-sub">' + runName(run.mode) + " · " + done.length +
       " von " + run.items.length + " Fragen bearbeitet</p>");
 
     h.push('<div class="score">');
@@ -810,7 +962,131 @@
     return h.join("");
   }
 
+  /* ---------------- Eingebauter Taschenrechner ---------------- */
+
+  /* Sofortausführung wie beim Taschenrechner des Telefons: eine Operation wird
+     ausgeführt, sobald die nächste gedrückt wird. Das Ergebnis lässt sich mit
+     einem Tippen in das zuletzt berührte Eingabefeld übernehmen. */
+  var calc = { open: false, display: "0", acc: null, op: null, fresh: true, target: 0 };
+
+  var KEYPAD = [
+    ["AC", "clear"], ["⌫", "back"], ["%", "percent"], ["÷", "op:/"],
+    ["7", "d:7"], ["8", "d:8"], ["9", "d:9"], ["×", "op:*"],
+    ["4", "d:4"], ["5", "d:5"], ["6", "d:6"], ["−", "op:-"],
+    ["1", "d:1"], ["2", "d:2"], ["3", "d:3"], ["+", "op:+"],
+    ["0", "d:0"], [",", "comma"], ["=", "equals"]
+  ];
+
+  function calcNumber() {
+    var v = parseFloat(calc.display.replace(/\./g, "").replace(",", "."));
+    return isFinite(v) ? v : 0;
+  }
+
+  function calcShow(n) {
+    if (!isFinite(n)) return "Fehler";
+    if (Math.abs(n) >= 1e15) return n.toExponential(6).replace(".", ",");
+    return n.toLocaleString("de-DE", { maximumFractionDigits: 8 });
+  }
+
+  function calcApply() {
+    var b = calcNumber(), a = calc.acc;
+    if (a === null || !calc.op) return b;
+    if (calc.op === "+") return a + b;
+    if (calc.op === "-") return a - b;
+    if (calc.op === "*") return a * b;
+    if (calc.op === "/") return b === 0 ? NaN : a / b;
+    return b;
+  }
+
+  function calcKey(code) {
+    if (code.indexOf("d:") === 0) {
+      var d = code.slice(2);
+      if (calc.fresh) { calc.display = d; calc.fresh = false; }
+      else if (calc.display.replace(/[^0-9]/g, "").length < 14) {
+        calc.display = calc.display === "0" ? d : calc.display + d;
+      }
+    } else if (code === "comma") {
+      if (calc.fresh) { calc.display = "0,"; calc.fresh = false; }
+      else if (calc.display.indexOf(",") === -1) calc.display += ",";
+    } else if (code.indexOf("op:") === 0) {
+      var next = code.slice(3);
+      if (calc.op && !calc.fresh) { calc.display = calcShow(calcApply()); }
+      calc.acc = calcNumber();
+      calc.op = next;
+      calc.fresh = true;
+    } else if (code === "equals") {
+      if (calc.op) { calc.display = calcShow(calcApply()); calc.acc = null; calc.op = null; calc.fresh = true; }
+    } else if (code === "clear") {
+      calc.display = "0"; calc.acc = null; calc.op = null; calc.fresh = true;
+    } else if (code === "back") {
+      if (calc.fresh) return;
+      calc.display = calc.display.length > 1 ? calc.display.slice(0, -1) : "0";
+      if (calc.display === "-" || calc.display === "") calc.display = "0";
+    } else if (code === "percent") {
+      calc.display = calcShow(calcNumber() / 100); calc.fresh = true;
+    }
+    renderCalculator();
+  }
+
+  function calcTakeOver() {
+    if (!run || !current().calc || current().checked) return;
+    var it = current();
+    var i = Math.min(calc.target, it.inputs.length - 1);
+    it.inputs[i] = calc.display;
+    var field = document.getElementById("calc" + i);
+    if (field) field.value = calc.display;
+    var btn = document.getElementById("submitBtn");
+    if (btn) btn.disabled = !calcReady(it);
+    calc.open = false;
+    renderCalculator();
+  }
+
+  function renderCalculator() {
+    var host = document.getElementById("calcpad");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "calcpad";
+      document.body.appendChild(host);
+    }
+    if (!(screen === "quiz" && run && current().calc)) { host.innerHTML = ""; return; }
+
+    var h = [];
+    if (!calc.open) {
+      h.push('<button class="calc-fab" data-act="calc-open" aria-label="Taschenrechner öffnen">' +
+        ICONS.rechnen + "</button>");
+    } else {
+      var it = current();
+      var ziel = Math.min(calc.target, it.inputs.length - 1);
+      h.push('<div class="calc-panel" role="dialog" aria-label="Taschenrechner">');
+      h.push('<div class="calc-bar"><span class="calc-title">Rechner</span>' +
+        '<button class="calc-close" data-act="calc-close" aria-label="Schließen">Fertig</button></div>');
+      h.push('<div class="calc-display tnum">' + esc(calc.display) + "</div>");
+      h.push('<div class="calc-keys">');
+      KEYPAD.forEach(function (k) {
+        var wide = k[0] === "0" ? " wide" : "";
+        var kind = /[0-9,]/.test(k[0]) ? "" :
+                   (k[1].indexOf("op:") === 0 || k[1] === "equals") ? " accent" : " muted";
+        h.push('<button class="calc-key' + wide + kind + '" data-act="calc-key" data-v="' +
+          esc(k[1]) + '">' + esc(k[0]) + "</button>");
+      });
+      h.push("</div>");
+      h.push('<button class="calc-take" data-act="calc-take">In Teilaufgabe ' +
+        "abcdefgh".charAt(ziel) + ") übernehmen</button>");
+      h.push("</div>");
+    }
+    host.innerHTML = h.join("");
+    document.body.classList.toggle("calc-open", calc.open);
+  }
+
   /* ---------------- Steuerung ---------------- */
+
+  function syncFormulaRow() {
+    var row = document.querySelector('[data-act="formula"]');
+    if (!row || !row.querySelector) return;
+    row.setAttribute("aria-pressed", state.showFormula);
+    var mark = row.querySelector(".row-check");
+    if (mark) mark.textContent = state.showFormula ? "✓" : "";
+  }
 
   function qsa(sel) {
     return Array.prototype.slice.call(document.querySelectorAll(sel));
@@ -836,35 +1112,52 @@
   }
 
   function syncSetup() {
-    var pool = poolForRun().length;
+    var qPool = questionPool().length, cPool = calcPool().length;
     var weak = weakCount();
 
     syncSegment("mode", function (v) { return state.mode === v; });
     syncSegment("size", function (v) { return state.size === parseInt(v, 10); });
+    syncSegment("calcsize", function (v) { return state.calcSize === parseInt(v, 10); });
     syncSegment("theme", function (v) { return state.theme === v; });
 
-    qsa('[data-act="cat"]').forEach(function (b) {
-      var on = state.cats.indexOf(b.getAttribute("data-v")) !== -1;
-      b.setAttribute("aria-pressed", on);
-      var mark = b.querySelector(".row-check");
-      if (mark) mark.textContent = on ? "✓" : "";
+    [["cat", state.cats], ["calccat", state.calcCats]].forEach(function (pair) {
+      qsa('[data-act="' + pair[0] + '"]').forEach(function (b) {
+        var on = pair[1].indexOf(b.getAttribute("data-v")) !== -1;
+        b.setAttribute("aria-pressed", on);
+        var mark = b.querySelector(".row-check");
+        if (mark) mark.textContent = on ? "✓" : "";
+      });
     });
 
     qsa("[data-progress]").forEach(function (el) {
-      el.textContent = catProgressText(catProgress(el.getAttribute("data-progress")));
+      el.textContent = catProgressText(
+        catProgress(el.getAttribute("data-progress"), el.getAttribute("data-kind")));
     });
 
     var all = document.getElementById("toggleAll");
-    if (all) all.textContent = state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen";
+    if (all) {
+      var list = state.tab === "rechnen" ? state.calcCats : state.cats;
+      all.textContent = list.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen";
+    }
 
     var mf = document.getElementById("modeFoot");
     if (mf) mf.textContent = modeFootText(weak);
-
     var sf = document.getElementById("sizeFoot");
-    if (sf) sf.textContent = poolFootText(pool);
+    if (sf) sf.textContent = poolFootText(qPool);
 
     var btn = document.getElementById("startBtn");
-    if (btn) { btn.disabled = !pool; btn.textContent = startBtnText(pool); }
+    if (btn) { btn.disabled = !qPool; btn.textContent = startBtnText(qPool); }
+    var cbtn = document.getElementById("startCalcBtn");
+    if (cbtn) {
+      cbtn.disabled = !cPool;
+      cbtn.textContent = cPool ? "Rechenrunde starten" : "Bitte Handlungsbereich wählen";
+    }
+    var cf = document.getElementById("calcSizeFoot");
+    if (cf) {
+      cf.textContent = cPool + " " + plural(cPool, "Aufgabe", "Aufgaben") +
+        " in der aktuellen Auswahl. Jede Aufgabe hat mehrere Teilaufgaben, plane etwa fünf bis zehn " +
+        "Minuten je Aufgabe.";
+    }
   }
 
   function syncAnswers() {
@@ -894,6 +1187,9 @@
     el.innerHTML = screen === "quiz"
       ? (current().calc ? calcScreen() : quizScreen())
       : screen === "result" ? resultScreen() : setupScreen();
+    document.body.classList.toggle("has-tabbar", screen === "setup");
+    document.body.classList.toggle("has-calc", screen === "quiz" && current().calc);
+    if (screen === "quiz" && current().calc) renderCalculator();
     window.scrollTo(0, keepScroll ? y : 0);
   }
 
@@ -915,8 +1211,28 @@
       state.cats = state.cats.length === CATEGORIES.length ? [] : CATEGORIES.map(function (c) { return c.id; });
       save(); syncSetup();
     }
-    else if (act === "formula") { state.showFormula = !state.showFormula; save(); render(true); }
+    else if (act === "tab") { state.tab = v; save(); render(); }
+    else if (act === "calcsize") { state.calcSize = parseInt(v, 10); save(); syncSetup(); }
+    else if (act === "calccat") {
+      var cpos = state.calcCats.indexOf(v);
+      if (cpos === -1) state.calcCats.push(v); else state.calcCats.splice(cpos, 1);
+      save(); syncSetup();
+    }
+    else if (act === "toggle-all-calc") {
+      state.calcCats = state.calcCats.length === CATEGORIES.length
+        ? [] : CATEGORIES.map(function (c) { return c.id; });
+      save(); syncSetup();
+    }
+    else if (act === "formula") {
+      state.showFormula = !state.showFormula; save();
+      if (screen === "quiz") render(true); else syncFormulaRow();
+    }
     else if (act === "start") startRun();
+    else if (act === "startcalc") startCalcRun();
+    else if (act === "calc-open") { calc.open = true; renderCalculator(); }
+    else if (act === "calc-close") { calc.open = false; renderCalculator(); }
+    else if (act === "calc-key") calcKey(v);
+    else if (act === "calc-take") calcTakeOver();
     else if (act === "pick") toggle(parseInt(v, 10));
     else if (act === "submit") submit();
     else if (act === "abort") { if (confirm("Runde beenden? Der Zwischenstand dieser Runde geht verloren.")) abortRun(); }
@@ -926,6 +1242,14 @@
       if (confirm("Wirklich den gesamten Lernfortschritt löschen? Das lässt sich nicht rückgängig machen.")) {
         state.stats = {}; save(); render(true);
       }
+    }
+  });
+
+  document.addEventListener("focusin", function (ev) {
+    var i = ev.target.getAttribute && ev.target.getAttribute("data-i");
+    if (i !== null && i !== undefined) {
+      calc.target = parseInt(i, 10);
+      if (calc.open) renderCalculator();
     }
   });
 
