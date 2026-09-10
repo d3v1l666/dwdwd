@@ -12,6 +12,7 @@ const TITLE = "Prüfungstrainer Logistiksysteme";
 
 const css = read("styles.css");
 const data = read("data/questions.js");
+const formulas = read("data/formulas.js");
 const app = read("app.js");
 
 // </script> in Zeichenketten würde den umschließenden Block vorzeitig beenden.
@@ -22,6 +23,7 @@ const inner = [
   `<style>\n${css}\n</style>`,
   '<div id="app"></div>',
   `<script>\n${safe(data)}\n</script>`,
+  `<script>\n${safe(formulas)}\n</script>`,
   `<script>\n${safe(app)}\n</script>`
 ].join("\n");
 

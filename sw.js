@@ -2,7 +2,7 @@
    Strategie: sofort aus dem Cache ausliefern, im Hintergrund aktualisieren
    (stale-while-revalidate). Neue Fassungen sind damit beim übernächsten
    Start aktiv, ohne dass die Cache-Version hochgezählt werden muss. */
-var CACHE = "fls-trainer-v5";
+var CACHE = "fls-trainer-v6";
 
 var ASSETS = [
   "./",
@@ -10,6 +10,7 @@ var ASSETS = [
   "./styles.css",
   "./app.js",
   "./data/questions.js",
+  "./data/formulas.js",
   "./manifest.webmanifest",
   "./icons/icon-180.png",
   "./icons/icon-192.png",

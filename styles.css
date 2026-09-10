@@ -591,3 +591,45 @@ details[open] .chevron { transform: rotate(90deg); }
   color: var(--tint);
   margin-right: 2px;
 }
+
+/* ---------- Rechentrainer ---------- */
+.formula {
+  padding: 14px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--label);
+}
+.task-text {
+  padding: 13px 16px;
+  font-size: 17px;
+  line-height: 1.35;
+}
+.task-text + .row::before { left: 0; }
+
+.numfield {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 16px;
+}
+.numfield input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  color: var(--label);
+  padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+.numfield input:disabled { color: var(--label-2); -webkit-text-fill-color: var(--label-2); opacity: 1; }
+.numfield .unit { color: var(--label-2); font-size: 15px; white-space: nowrap; }
+
+.result-line { padding: 2px 16px 12px; font-size: 15px; color: var(--label-2); }
+.result-line b { color: var(--label); font-weight: 600; }
+.steps { margin: 0; padding: 0 16px 14px 34px; }
+.steps li { font-size: 15px; line-height: 1.45; color: var(--label-2); margin-bottom: 6px; }
+.steps li:last-child { margin-bottom: 0; }
+.detail-body .steps { padding-left: 18px; }
