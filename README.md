@@ -1,8 +1,9 @@
 # Prüfungstrainer Logistiksysteme
 
 Lern-App zur Vorbereitung auf die IHK-Fortbildungsprüfung **Geprüfte/r Fachwirt/in für
-Logistiksysteme**. 250 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort,
-verteilt auf die vier Handlungsbereiche der Prüfung.
+Logistiksysteme**. 250 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort sowie
+30 Rechenaufgaben zu Kennzahlen mit angezeigter Formel, verteilt auf die vier
+Handlungsbereiche der Prüfung.
 
 Die Oberfläche folgt den iOS-Mustern – Systemschrift, gruppierte Listen, Segmented
 Controls und die Systemfarben für hell und dunkel –, damit sie sich als
@@ -65,6 +66,7 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 | Lernmodus | Auflösung und Erläuterung direkt nach jeder Frage |
 | Prüfungssimulation | auf Zeit (90 Sekunden je Frage), Auswertung erst am Ende |
 | Fehlerspeicher | nur Fragen, die zuletzt falsch beantwortet wurden |
+| Rechentrainer | Kennzahlen und Formeln mit immer neuen Zahlen, Formel wird angezeigt |
 
 **Weiteres**
 
@@ -85,6 +87,57 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 Der Lernfortschritt liegt ausschließlich im `localStorage` des jeweiligen Browsers.
 Er wird nicht übertragen und geht verloren, wenn die Browserdaten gelöscht werden
 oder ein anderes Gerät verwendet wird.
+
+## Rechentrainer
+
+30 Kennzahlen und Formeln als Rechenaufgaben, die bei jedem Aufruf **neue Zahlen**
+erzeugen – geübt wird der Rechenweg, nicht das Ergebnis. Abgedeckt sind unter anderem
+Meldebestand, optimale Bestellmenge nach Andler, Break-even-Menge, Umschlagshäufigkeit,
+Lagerdauer, Lagerzinssatz und Lagerzinsen, Lagerreichweite, Taktzeit, OEE, Nettobedarf,
+Bezugspreis, Deckungsbeitrag, Amortisationsdauer, frachtpflichtiges Gewicht in der
+Luftfracht, Auslastungsgrad, Kosten je Tonnenkilometer, Termintreue, ppm-Fehlerquote
+sowie Personalbedarf, Fehlzeiten- und Fluktuationsquote.
+
+Zu jeder Aufgabe steht die benötigte **Formel** über der Aufgabenstellung; sie lässt
+sich mit einem Tippen ausblenden, wer sich selbst prüfen will. Nach dem Prüfen
+erscheinen die richtige Lösung und der vollständige Rechenweg Schritt für Schritt.
+
+Die Eingabe wird deutsch gelesen: Nachkommastellen mit Komma. Geprüft wird mit einer
+kleinen Toleranz, damit Zwischenrundungen nicht als Fehler zählen. Rechenaufgaben
+zählen wie Fragen in den Lernfortschritt ihres Handlungsbereichs.
+
+### Eine Rechenaufgabe ergänzen
+
+Vorlagen stehen in `data/formulas.js`. `make()` erzeugt bei jedem Aufruf einen neuen
+Satz Zahlen und liefert Aufgabentext, Angaben, Lösung und Rechenweg:
+
+```js
+{
+  id: "RCH-31",                 // dauerhafte Kennung, NIE ändern
+  cat: "ums",                   // Handlungsbereich
+  topic: "Logistikcontrolling",
+  name: "Umschlagshäufigkeit",
+  formula: "Umschlagshäufigkeit = Wareneinsatz ÷ durchschnittlicher Lagerbestand",
+  unit: "Umschläge je Jahr",
+  decimals: 1,                  // erwartete Nachkommastellen
+  tol: 2,                       // optional: eigene Toleranz statt der abgeleiteten
+  make: function () {
+    var uh = ri(4, 14), bestand = ri(15, 45) * 10000;
+    return {
+      text:  "Wie oft wird der Lagerbestand im Jahr umgeschlagen?",
+      given: [["Wareneinsatz im Jahr", eur(uh * bestand)],
+              ["Durchschnittlicher Lagerbestand", eur(bestand)]],
+      value: uh,                          // exakte Lösung
+      steps: ["… = " + nf(uh, 1)]         // Rechenweg, Schritt für Schritt
+    };
+  }
+}
+```
+
+Wähle die Zufallswerte so, dass sich ein sauberes Ergebnis einstellt – am besten das
+Ergebnis zuerst ziehen und die Angaben daraus ableiten (oben: `uh` zuerst, der
+Wareneinsatz folgt daraus). Achte darauf, dass keine negativen oder sinnlosen Werte
+entstehen können.
 
 ## Handlungsbereiche
 
@@ -162,7 +215,8 @@ Umsetzung der alten Struktur ergänzt.
 index.html              Gerüst und Einbindung
 styles.css              Gestaltung, helles und dunkles Farbschema
 app.js                  Ablauf, Auswertung, Speicherung
-data/questions.js       Fragenkatalog und Handlungsfelder
+data/questions.js       Fragenkatalog und Handlungsbereiche
+data/formulas.js        Rechenaufgaben mit Zufallszahlen
 build.js                erzeugt die Einzeldatei-Fassungen in dist/
 manifest.webmanifest    Name, Icons und Startverhalten der installierten App
 sw.js                   Service Worker für den Offlinebetrieb
