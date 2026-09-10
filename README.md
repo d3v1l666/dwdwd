@@ -4,6 +4,12 @@ Lern-App zur Vorbereitung auf die IHK-Fortbildungsprüfung **Geprüfte/r Fachwir
 Logistiksysteme**. 224 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort,
 verteilt auf 13 Handlungsfelder.
 
+Die Oberfläche folgt den iOS-Mustern – Systemschrift, gruppierte Listen, Segmented
+Controls und die Systemfarben für hell und dunkel –, damit sie sich als
+Home-Bildschirm-App auf dem iPhone wie eine native App anfühlt. Webfonts werden nicht
+geladen; die App nutzt die Systemschrift des Geräts und startet dadurch sofort und
+ohne Netz.
+
 ## Benutzen
 
 Ohne Installation: `index.html` im Browser öffnen. Es gibt keinen Build-Schritt und
@@ -71,8 +77,8 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 - Beherrschungsgrad je Handlungsfeld: eine Frage gilt als sicher, wenn sie zweimal
   hintereinander richtig beantwortet wurde
 - Countdown bis zum eingetragenen Prüfungstermin
-- Helles und dunkles Erscheinungsbild, Bedienung per Tastatur
-  (`1`–`9` auswählen, `Enter` weiter, `Esc` beenden)
+- Darstellung wahlweise automatisch (Systemeinstellung), hell oder dunkel
+- Bedienung per Tastatur am Rechner (`1`–`9` auswählen, `Enter` weiter, `Esc` beenden)
 
 Der Lernfortschritt liegt ausschließlich im `localStorage` des jeweiligen Browsers.
 Er wird nicht übertragen und geht verloren, wenn die Browserdaten gelöscht werden

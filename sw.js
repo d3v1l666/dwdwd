@@ -2,7 +2,7 @@
    Strategie: sofort aus dem Cache ausliefern, im Hintergrund aktualisieren
    (stale-while-revalidate). Neue Fassungen sind damit beim übernächsten
    Start aktiv, ohne dass die Cache-Version hochgezählt werden muss. */
-var CACHE = "fls-trainer-v1";
+var CACHE = "fls-trainer-v2";
 
 var ASSETS = [
   "./",
@@ -42,10 +42,8 @@ self.addEventListener("fetch", function (ev) {
   var req = ev.request;
   if (req.method !== "GET") return;
 
-  var url = new URL(req.url);
-  var sameOrigin = url.origin === self.location.origin;
-  var isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
-  if (!sameOrigin && !isFont) return;
+  // Die App laedt ausschliesslich eigene Dateien und die Systemschrift des Geraets.
+  if (new URL(req.url).origin !== self.location.origin) return;
 
   ev.respondWith(
     caches.open(CACHE).then(function (cache) {
@@ -55,8 +53,6 @@ self.addEventListener("fetch", function (ev) {
           return res;
         }).catch(function () { return null; });
 
-        // Schriften: einmal geladen, immer aus dem Cache – spart Daten unterwegs.
-        if (hit && isFont) return hit;
         if (hit) { net; return hit; }
 
         return net.then(function (res) {

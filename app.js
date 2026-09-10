@@ -7,12 +7,14 @@
   var QUESTIONS = window.QUESTIONS || [];
   var CATEGORIES = window.CATEGORIES || [];
   var MODULES = window.MODULES || [];
-  var KEYS = "ABCDEFGHI";
 
   var MODES = {
-    lernen:   { name: "Lernmodus",       desc: "Auflösung und Erläuterung direkt nach jeder Frage." },
-    pruefung: { name: "Prüfungssimulation", desc: "Auf Zeit, Auswertung erst am Ende. 90 Sekunden je Frage." },
-    fehler:   { name: "Fehlerspeicher",  desc: "Nur Fragen, die zuletzt falsch beantwortet wurden." }
+    lernen:   { tab: "Lernen",  name: "Lernmodus",
+                desc: "Auflösung und Erläuterung direkt nach jeder Frage." },
+    pruefung: { tab: "Prüfung", name: "Prüfungssimulation",
+                desc: "Auf Zeit, Auswertung erst am Ende. 90 Sekunden je Frage." },
+    fehler:   { tab: "Fehler",  name: "Fehlerspeicher",
+                desc: "Nur Fragen, die zuletzt falsch beantwortet wurden." }
   };
 
   /* IHK-Bewertungsschlüssel */
@@ -25,20 +27,23 @@
     { min: 0,  label: "ungenügend",   note: 6 }
   ];
 
+  var THEMES = [
+    { id: "",      label: "Automatisch" },
+    { id: "light", label: "Hell" },
+    { id: "dark",  label: "Dunkel" }
+  ];
+
   /* ---------------- Zustand ---------------- */
 
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+
   function nextSpringDate() {
-    var now = new Date();
-    var y = now.getFullYear();
+    var now = new Date(), y = now.getFullYear();
     var d = new Date(y, 3, 28);
     if (d <= now) d = new Date(y + 1, 3, 28);
     return iso(d);
   }
-
-  function iso(d) {
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
-  }
-  function pad(n) { return (n < 10 ? "0" : "") + n; }
 
   var state = {
     theme: "",
@@ -54,14 +59,13 @@
       var raw = localStorage.getItem(STORE);
       if (!raw) return;
       var saved = JSON.parse(raw);
-      if (saved && typeof saved === "object") {
-        if (saved.theme) state.theme = saved.theme;
-        if (saved.examDate) state.examDate = saved.examDate;
-        if (MODES[saved.mode]) state.mode = saved.mode;
-        if (typeof saved.size === "number") state.size = saved.size;
-        if (Array.isArray(saved.cats) && saved.cats.length) state.cats = saved.cats;
-        if (saved.stats && typeof saved.stats === "object") state.stats = saved.stats;
-      }
+      if (!saved || typeof saved !== "object") return;
+      if (typeof saved.theme === "string") state.theme = saved.theme;
+      if (saved.examDate) state.examDate = saved.examDate;
+      if (MODES[saved.mode]) state.mode = saved.mode;
+      if (typeof saved.size === "number") state.size = saved.size;
+      if (Array.isArray(saved.cats) && saved.cats.length) state.cats = saved.cats;
+      if (saved.stats && typeof saved.stats === "object") state.stats = saved.stats;
     } catch (e) { /* privater Modus o. Ä.: ohne gespeicherten Fortschritt weiterarbeiten */ }
   }
 
@@ -69,9 +73,7 @@
     try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
   }
 
-  function statOf(id) {
-    return state.stats[id] || { seen: 0, right: 0, wrong: 0, streak: 0 };
-  }
+  function statOf(id) { return state.stats[id] || { seen: 0, right: 0, wrong: 0, streak: 0 }; }
   function isMastered(id) { return statOf(id).streak >= 2; }
   function isWeak(id) {
     var s = statOf(id);
@@ -100,9 +102,7 @@
     return { code: "?", name: "Unbekannt" };
   }
 
-  function inCat(id) {
-    return QUESTIONS.filter(function (q) { return q.cat === id; });
-  }
+  function inCat(id) { return QUESTIONS.filter(function (q) { return q.cat === id; }); }
 
   function daysUntil(dateStr) {
     var target = new Date(dateStr + "T00:00:00");
@@ -115,7 +115,7 @@
   function germanDate(dateStr) {
     var d = new Date(dateStr + "T00:00:00");
     if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+    return d.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
   }
 
   function gradeFor(pct) {
@@ -124,6 +124,24 @@
   }
 
   function plural(n, one, many) { return n === 1 ? one : many; }
+
+  /* ---------------- Bausteine ---------------- */
+
+  function segmented(act, items, isOn) {
+    var h = ['<div class="segmented">'];
+    items.forEach(function (it) {
+      h.push('<button data-act="' + act + '" data-v="' + esc(it.v) + '" aria-pressed="' +
+        isOn(it) + '"' + (it.disabled ? " disabled" : "") + '>' + esc(it.label) + '</button>');
+    });
+    h.push("</div>");
+    return h.join("");
+  }
+
+  function groupHead(text, action) {
+    return '<div class="group-head' + (action ? " with-action" : "") + '"><span>' + esc(text) + "</span>" +
+      (action ? '<button class="head-action" data-act="' + action.act + '">' + esc(action.label) + "</button>" : "") +
+      "</div>";
+  }
 
   /* ---------------- Lauf ---------------- */
 
@@ -137,26 +155,24 @@
     return pool;
   }
 
+  function makeItems(list) {
+    return list.map(function (q) {
+      return {
+        q: q,
+        order: shuffle(q.a.map(function (_, i) { return i; })),
+        picked: [],
+        checked: false,
+        correct: null
+      };
+    });
+  }
+
   function startRun() {
     var pool = shuffle(poolForRun());
     if (!pool.length) return;
     if (state.size > 0) pool = pool.slice(0, state.size);
 
-    run = {
-      mode: state.mode,
-      items: pool.map(function (q) {
-        return {
-          q: q,
-          order: shuffle(q.a.map(function (_, i) { return i; })),
-          picked: [],
-          checked: false,
-          correct: null
-        };
-      }),
-      i: 0,
-      deadline: 0
-    };
-
+    run = { mode: state.mode, items: makeItems(pool), i: 0, deadline: 0 };
     if (run.mode === "pruefung") {
       run.deadline = Date.now() + run.items.length * 90000;
       startTimer();
@@ -174,7 +190,7 @@
       var el = document.getElementById("timer");
       if (el) {
         el.textContent = clockText(left);
-        el.className = left < 120000 ? "timer low" : "timer";
+        el.className = left < 120000 ? "nav-timer low" : "nav-timer";
       }
     }, 1000);
   }
@@ -206,8 +222,12 @@
 
   function record(it) {
     var s = statOf(it.q.id);
-    s = { seen: s.seen + 1, right: s.right + (it.correct ? 1 : 0), wrong: s.wrong + (it.correct ? 0 : 1), streak: it.correct ? s.streak + 1 : 0 };
-    state.stats[it.q.id] = s;
+    state.stats[it.q.id] = {
+      seen: s.seen + 1,
+      right: s.right + (it.correct ? 1 : 0),
+      wrong: s.wrong + (it.correct ? 0 : 1),
+      streak: it.correct ? s.streak + 1 : 0
+    };
     save();
   }
 
@@ -237,20 +257,23 @@
     else finishRun();
   }
 
-  function finishRun() {
-    stopTimer();
-    screen = "result";
+  function finishRun() { stopTimer(); screen = "result"; render(); }
+  function abortRun() { stopTimer(); run = null; screen = "setup"; render(); }
+
+  function retryWrong() {
+    var wrong = run.items.filter(function (it) { return it.checked && !it.correct; });
+    if (!wrong.length) return;
+    run = {
+      mode: "lernen",
+      items: makeItems(shuffle(wrong.map(function (it) { return it.q; }))),
+      i: 0,
+      deadline: 0
+    };
+    screen = "quiz";
     render();
   }
 
-  function abortRun() {
-    stopTimer();
-    run = null;
-    screen = "setup";
-    render();
-  }
-
-  /* ---------------- Darstellung: Startseite ---------------- */
+  /* ---------------- Startseite ---------------- */
 
   function setupScreen() {
     var total = QUESTIONS.length;
@@ -264,91 +287,106 @@
     });
     var quote = answered ? Math.round(right / answered * 100) : 0;
     var weak = QUESTIONS.filter(function (q) { return isWeak(q.id); }).length;
-
     var days = daysUntil(state.examDate);
     var pool = poolForRun().length;
 
     var h = [];
-    h.push('<header class="masthead">');
-    h.push('<div><h1>Prüfungstrainer<br><span class="accent">Logistiksysteme</span></h1>');
-    h.push('<div class="eyebrow masthead-sub">' + total + ' Fragen · 13 Handlungsfelder · IHK-Fortbildung</div></div>');
-    h.push('<button class="icon-btn" data-act="theme">' + (isDark() ? "Hell" : "Dunkel") + '</button>');
-    h.push('</header>');
+    h.push('<h1 class="large-title">Prüfungstrainer</h1>');
+    h.push('<p class="large-sub">Fachwirt für Logistiksysteme · ' + total + ' Fragen in 13 Handlungsfeldern</p>');
 
-    h.push('<div class="countdown">');
-    h.push('<div class="countdown-days">' + (days === null ? "–" : (days > 0 ? days : 0)) + '</div>');
-    h.push('<div class="countdown-text"><strong>' + (days > 0 ? plural(days, "Tag", "Tage") + " bis zur Prüfung" : "Prüfungstermin erreicht") + '</strong>');
-    h.push(germanDate(state.examDate) + (days > 0 ? " · das sind rund " + Math.max(1, Math.round(days / 7)) + " " + plural(Math.round(days / 7), "Woche", "Wochen") : "") + '</div>');
+    h.push('<div class="widget">');
+    h.push('<div class="widget-num tnum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
+    h.push('<div class="widget-body"><div class="widget-title">' +
+      (days > 0 ? plural(days, "Tag", "Tage") + " bis zur Prüfung" : "Prüfungstermin erreicht") + "</div>");
+    h.push('<div class="widget-sub">' + germanDate(state.examDate) +
+      (days > 0 ? " · rund " + Math.max(1, Math.round(days / 7)) + " " +
+        plural(Math.round(days / 7), "Woche", "Wochen") : "") + "</div></div>");
+    h.push("</div>");
+    h.push('<div class="section"><div class="group"><div class="row">');
+    h.push('<span class="row-main"><span class="row-title">Prüfungstermin</span></span>');
     h.push('<input type="date" id="examDate" value="' + esc(state.examDate) + '" aria-label="Prüfungstermin">');
-    h.push('</div>');
+    h.push("</div></div></div>");
 
-    h.push('<div class="stat-row">');
-    h.push(statTile(seen + " / " + total, "Fragen mindestens einmal bearbeitet"));
-    h.push(statTile(quote + " %", "Trefferquote über alle Versuche"));
-    h.push(statTile(String(mastered), "sicher beherrscht (2x in Folge richtig)"));
-    h.push(statTile(String(weak), "im Fehlerspeicher"));
-    h.push('</div>');
+    h.push('<div class="tiles">');
+    h.push(tile(seen + " / " + total, "Fragen bearbeitet"));
+    h.push(tile(quote + " %", "Trefferquote"));
+    h.push(tile(String(mastered), "sicher beherrscht"));
+    h.push(tile(String(weak), "im Fehlerspeicher"));
+    h.push("</div>");
 
-    h.push('<section class="section"><div class="section-head"><h2>Modus</h2></div><div class="mode-grid">');
-    Object.keys(MODES).forEach(function (k) {
-      var disabled = k === "fehler" && weak === 0;
-      h.push('<button class="mode" data-act="mode" data-mode="' + k + '" aria-pressed="' + (state.mode === k) + '"' + (disabled ? " disabled" : "") + '>');
-      h.push('<span class="mode-name">' + MODES[k].name + '</span>');
-      h.push('<span class="mode-desc">' + (disabled ? "Noch keine falsch beantworteten Fragen gespeichert." : MODES[k].desc) + '</span>');
-      h.push('</button>');
-    });
-    h.push('</div></section>');
+    h.push('<div class="section">');
+    h.push(groupHead("Modus"));
+    h.push(segmented("mode", Object.keys(MODES).map(function (k) {
+      return { v: k, label: MODES[k].tab, disabled: k === "fehler" && weak === 0 };
+    }), function (it) { return state.mode === it.v; }));
+    h.push('<div class="group-foot">' + esc(
+      state.mode === "fehler" && weak === 0
+        ? "Noch keine falsch beantworteten Fragen gespeichert."
+        : MODES[state.mode].desc) + "</div>");
+    h.push("</div>");
 
-    h.push('<section class="section"><div class="section-head"><h2>Umfang</h2>');
-    h.push('<span class="section-note">' + pool + ' ' + plural(pool, "Frage", "Fragen") + ' in der Auswahl</span></div>');
-    h.push('<div class="seg">');
-    [10, 20, 40, 0].forEach(function (n) {
-      h.push('<button data-act="size" data-size="' + n + '" aria-pressed="' + (state.size === n) + '">' + (n === 0 ? "alle" : n) + '</button>');
-    });
-    h.push('</div></section>');
+    h.push('<div class="section">');
+    h.push(groupHead("Umfang"));
+    h.push(segmented("size", [
+      { v: "10", label: "10" }, { v: "20", label: "20" },
+      { v: "40", label: "40" }, { v: "0", label: "Alle" }
+    ], function (it) { return state.size === parseInt(it.v, 10); }));
+    h.push('<div class="group-foot">' + pool + " " + plural(pool, "Frage", "Fragen") +
+      " in der aktuellen Auswahl.</div>");
+    h.push("</div>");
 
-    h.push('<section class="section"><div class="section-head"><h2>Themengebiete</h2>');
-    h.push('<button class="link-btn" data-act="toggle-all">' + (state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen") + '</button></div>');
-
-    MODULES.forEach(function (m) {
+    MODULES.forEach(function (m, mi) {
       var cats = CATEGORIES.filter(function (c) { return c.mod === m.id; });
       if (!cats.length) return;
-      h.push('<div class="module-label">' + esc(m.name) + '</div><div class="cat-list">');
+      h.push('<div class="section">');
+      h.push(groupHead(m.name, mi === 0 ? {
+        act: "toggle-all",
+        label: state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen"
+      } : null));
+      h.push('<div class="group">');
       cats.forEach(function (c) {
         var qs = inCat(c.id);
         var mast = qs.filter(function (q) { return isMastered(q.id); }).length;
-        var pctM = qs.length ? Math.round(mast / qs.length * 100) : 0;
         var on = state.cats.indexOf(c.id) !== -1;
-        h.push('<button class="cat" data-act="cat" data-cat="' + c.id + '" aria-pressed="' + on + '">');
-        h.push('<span class="cat-box" aria-hidden="true">✓</span>');
-        h.push('<span class="cat-code">' + esc(c.code) + '</span>');
-        h.push('<span class="cat-name">' + esc(c.name) + '</span>');
-        h.push('<span class="cat-meta"><span class="mastery" title="' + pctM + ' % sicher beherrscht"><span style="width:' + pctM + '%"></span></span>');
-        h.push('<span class="cat-count">' + qs.length + '</span></span>');
-        h.push('</button>');
+        h.push('<button class="row tap" data-act="cat" data-v="' + c.id + '" aria-pressed="' + on + '">');
+        h.push('<span class="row-main"><span class="row-title">' + esc(c.name) + "</span>");
+        h.push('<span class="row-sub">' + qs.length + " Fragen · " + mast + " sicher</span></span>");
+        h.push('<span class="row-check">' + (on ? "✓" : "") + "</span>");
+        h.push("</button>");
       });
-      h.push('</div>');
+      h.push("</div></div>");
     });
-    h.push('</section>');
 
-    h.push('<button class="primary" data-act="start"' + (pool ? "" : " disabled") + '>' +
-      (pool ? "Runde starten" : "Bitte Themengebiet wählen") + '</button>');
+    h.push('<div class="section">');
+    h.push('<button class="btn" data-act="start"' + (pool ? "" : " disabled") + ">" +
+      (pool ? "Runde starten" : "Bitte Handlungsfeld wählen") + "</button>");
+    h.push("</div>");
 
-    h.push('<div class="reset-row"><button class="link-btn" data-act="reset">Fortschritt zurücksetzen</button></div>');
+    h.push('<div class="section">');
+    h.push(groupHead("Darstellung"));
+    h.push(segmented("theme", THEMES.map(function (t) { return { v: t.id, label: t.label }; }),
+      function (it) { return state.theme === it.v; }));
+    h.push("</div>");
 
-    h.push('<p class="footnote">Bewertet wird streng: Bei Mehrfachauswahl zählt die Antwort nur, wenn genau alle richtigen Aussagen angekreuzt sind. ' +
-      'Die Notenstufen folgen dem IHK-Bewertungsschlüssel (ab 50 Prozent bestanden). ' +
-      'Die Zuordnung der Fragen zu den Handlungsfeldern orientiert sich an den üblichen IHK-Prüfungsinhalten – gleiche den Zuschnitt bitte mit dem Rahmenplan deiner Kammer ab. ' +
-      'Der Fortschritt wird nur lokal in diesem Browser gespeichert.</p>');
+    h.push('<div class="section"><div class="group">');
+    h.push('<button class="row tap destructive row-pad" data-act="reset">Fortschritt zurücksetzen</button>');
+    h.push("</div>");
+    h.push('<div class="group-foot">Bei Mehrfachauswahl zählt eine Antwort nur, wenn genau alle richtigen ' +
+      'Aussagen angekreuzt sind. Die Notenstufen folgen dem IHK-Bewertungsschlüssel, bestanden ab 50 Prozent. ' +
+      'Die Zuordnung der Fragen zu den Handlungsfeldern orientiert sich an den üblichen IHK-Prüfungsinhalten – ' +
+      'gleiche den Zuschnitt mit dem Rahmenplan deiner Kammer ab. Der Fortschritt wird nur lokal in diesem ' +
+      'Browser gespeichert.</div>');
+    h.push("</div>");
 
     return h.join("");
   }
 
-  function statTile(v, l) {
-    return '<div class="stat"><span class="stat-value">' + esc(v) + '</span><span class="stat-label">' + esc(l) + '</span></div>';
+  function tile(num, label) {
+    return '<div class="tile"><div class="tile-num tnum">' + esc(num) +
+      '</div><div class="tile-label">' + esc(label) + "</div></div>";
   }
 
-  /* ---------------- Darstellung: Frage ---------------- */
+  /* ---------------- Frage ---------------- */
 
   function quizScreen() {
     var it = current();
@@ -356,68 +394,61 @@
     var c = catById(q.cat);
     var multi = q.c.length > 1;
     var exam = run.mode === "pruefung";
+    var pct = (run.i + (it.checked ? 1 : 0)) / run.items.length * 100;
 
     var h = [];
-    h.push('<div class="runbar">');
-    h.push('<button class="icon-btn" data-act="abort">Beenden</button>');
-    h.push('<span class="runbar-count">' + (run.i + 1) + ' <span class="of">/ ' + run.items.length + '</span></span>');
-    h.push('<span class="runbar-mode">' + MODES[run.mode].name + '</span>');
-    if (exam) h.push('<span class="timer" id="timer">' + clockText(run.deadline - Date.now()) + '</span>');
-    h.push('</div>');
+    h.push('<div class="navbar">');
+    h.push('<button class="nav-btn" data-act="abort">Beenden</button>');
+    h.push('<div class="nav-title tnum">' + (run.i + 1) + " von " + run.items.length + "</div>");
+    h.push('<div class="nav-right">' +
+      (exam ? '<span class="nav-timer" id="timer">' + clockText(run.deadline - Date.now()) + "</span>" : "") +
+      "</div>");
+    h.push("</div>");
 
-    h.push('<div class="rail">');
-    run.items.forEach(function (item, idx) {
-      var cls = "";
-      if (idx === run.i) cls = "now";
-      else if (item.checked) cls = exam ? "done" : (item.correct ? "right" : "wrong");
-      h.push('<i class="' + cls + '"></i>');
-    });
-    h.push('</div>');
+    h.push('<div class="progress"><b style="width:' + pct + '%"></b></div>');
 
-    h.push('<div class="card">');
-    h.push('<div class="card-head">');
-    h.push('<span class="tag">' + esc(c.code) + ' · ' + esc(q.id) + '</span>');
-    h.push('<span class="tag' + (multi ? " multi" : "") + '">' + (multi ? "Mehrfachauswahl" : "Eine Antwort") + '</span>');
-    h.push('</div>');
-    h.push('<p class="question">' + esc(q.q) + '</p>');
+    h.push('<div class="q-cat">' + esc(c.name) + "</div>");
+    h.push('<h2 class="q-text">' + esc(q.q) + "</h2>");
+    h.push('<p class="q-hint">' + (multi ? "Mehrfachauswahl – alle zutreffenden Aussagen ankreuzen" : "Eine Antwort") + "</p>");
 
-    h.push('<div class="answers">');
+    h.push('<div class="section"><div class="group">');
     it.order.forEach(function (origIdx, d) {
       var picked = it.picked.indexOf(d) !== -1;
       var correct = q.c.indexOf(origIdx) !== -1;
-      var cls = "answer", mark = "";
+      var cls = "answer", glyph = "✓";
       if (it.checked && !exam) {
-        if (picked && correct) { cls += " is-right"; mark = "✓"; }
-        else if (picked && !correct) { cls += " is-wrong"; mark = "✕"; }
-        else if (!picked && correct) { cls += " is-missed"; mark = "✓"; }
+        if (picked && correct) cls += " right";
+        else if (picked && !correct) { cls += " wrong"; glyph = "✕"; }
+        else if (!picked && correct) cls += " missed";
       }
-      h.push('<button class="' + cls + '" data-act="pick" data-d="' + d + '" aria-pressed="' + picked + '"' + (it.checked ? " disabled" : "") + '>');
-      h.push('<span class="answer-key">' + KEYS[d] + '</span>');
-      h.push('<span>' + esc(q.a[origIdx]) + '</span>');
-      h.push('<span class="answer-mark">' + mark + '</span>');
-      h.push('</button>');
+      var showGlyph = picked || (it.checked && !exam && correct);
+      h.push('<button class="' + cls + '" data-act="pick" data-v="' + d + '" aria-pressed="' + picked + '"' +
+        (it.checked ? " disabled" : "") + ">");
+      h.push('<span class="bullet">' + (showGlyph ? glyph : "") + "</span>");
+      h.push('<span class="answer-text">' + esc(q.a[origIdx]) + "</span>");
+      h.push("</button>");
     });
-    h.push('</div>');
+    h.push("</div></div>");
 
     if (it.checked && !exam) {
-      h.push('<div class="verdict ' + (it.correct ? "right" : "wrong") + '">' +
-        (it.correct ? "Richtig" : "Falsch") +
-        '<small>' + esc(c.name) + '</small></div>');
-      h.push('<p class="explain">' + esc(q.e) + '</p>');
+      h.push('<div class="section"><div class="group">');
+      h.push('<div class="verdict ' + (it.correct ? "ok" : "no") + '">' +
+        (it.correct ? "✓ Richtig" : "✕ Falsch") + "</div>");
+      h.push('<p class="explain">' + esc(q.e) + "</p>");
+      h.push("</div></div>");
     }
-    h.push('</div>');
 
     var label;
-    if (exam) label = run.i === run.items.length - 1 ? "Antwort speichern und auswerten" : "Antwort speichern";
+    if (exam) label = run.i === run.items.length - 1 ? "Speichern und auswerten" : "Antwort speichern";
     else if (!it.checked) label = "Antwort prüfen";
     else label = run.i === run.items.length - 1 ? "Runde auswerten" : "Nächste Frage";
 
-    h.push('<button class="primary" data-act="submit"' + (it.picked.length ? "" : " disabled") + '>' + label + '</button>');
-    h.push('<p class="hint">Tasten <kbd>1</kbd>–<kbd>' + it.order.length + '</kbd> zum Auswählen · <kbd>Enter</kbd> weiter · <kbd>Esc</kbd> beenden</p>');
+    h.push('<button class="btn" data-act="submit"' + (it.picked.length ? "" : " disabled") + ">" + label + "</button>");
+    h.push('<p class="kbd-hint">Tasten 1–' + it.order.length + " zum Auswählen · Enter weiter · Esc beenden</p>");
     return h.join("");
   }
 
-  /* ---------------- Darstellung: Ergebnis ---------------- */
+  /* ---------------- Ergebnis ---------------- */
 
   function resultScreen() {
     var done = run.items.filter(function (it) { return it.checked; });
@@ -434,64 +465,65 @@
     });
 
     var h = [];
-    h.push('<header class="masthead"><div><h1>Auswertung</h1>');
-    h.push('<div class="eyebrow masthead-sub">' + MODES[run.mode].name + ' · ' + done.length + ' von ' + run.items.length + ' Fragen bearbeitet</div></div>');
-    h.push('<button class="icon-btn" data-act="theme">' + (isDark() ? "Hell" : "Dunkel") + '</button></header>');
+    h.push('<h1 class="large-title">Ergebnis</h1>');
+    h.push('<p class="large-sub">' + MODES[run.mode].name + " · " + done.length +
+      " von " + run.items.length + " Fragen bearbeitet</p>");
 
     h.push('<div class="score">');
-    h.push('<div class="score-pct">' + pct + '<span style="font-size:.45em"> %</span></div>');
-    h.push('<div class="score-body"><h2 class="grade ' + (passed ? "pass" : "fail") + '">' + g.label + '</h2>');
-    h.push('<p>' + hits + ' von ' + done.length + ' Fragen richtig · Note ' + g.note + ' nach IHK-Schlüssel · ' +
-      (passed ? "bestanden" : "nicht bestanden (50 Prozent erforderlich)") + '</p></div></div>');
+    h.push('<div class="score-num tnum">' + pct + "<small> %</small></div>");
+    h.push('<div class="score-grade ' + (passed ? "pass" : "fail") + '">' + esc(g.label) + "</div>");
+    h.push('<div class="score-sub">' + hits + " von " + done.length + " richtig · Note " + g.note +
+      " nach IHK-Schlüssel<br>" + (passed ? "bestanden" : "nicht bestanden, 50 Prozent erforderlich") + "</div>");
+    h.push("</div>");
 
-    h.push('<section class="section"><div class="section-head"><h2>Nach Handlungsfeld</h2>' +
-      '<span class="section-note">grün richtig · rot falsch</span></div><div class="bar-list">');
-    Object.keys(byCat).sort().forEach(function (k) {
+    h.push('<div class="section">');
+    h.push(groupHead("Nach Handlungsfeld"));
+    h.push('<div class="group">');
+    Object.keys(byCat).sort(function (a, b) {
+      return catById(a).name.localeCompare(catById(b).name, "de");
+    }).forEach(function (k) {
       var v = byCat[k], n = v.r + v.w, p = Math.round(v.r / n * 100);
-      h.push('<div class="bar-row"><span class="bar-code">' + esc(catById(k).code) + '</span>');
-      h.push('<span class="bar-track"><b style="width:' + (v.r / n * 100) + '%"></b><i style="width:' + (v.w / n * 100) + '%"></i></span>');
-      h.push('<span class="bar-val">' + p + ' % · ' + n + '</span></div>');
+      h.push('<div class="row"><span class="row-main"><span class="row-title">' + esc(catById(k).name) + "</span>");
+      h.push('<span class="bar"><b style="width:' + (v.r / n * 100) + '%"></b>' +
+        '<i style="width:' + (v.w / n * 100) + '%"></i></span></span>');
+      h.push('<span class="row-value">' + v.r + "/" + n + " · " + p + " %</span></div>");
     });
-    h.push('</div></section>');
+    h.push("</div></div>");
 
     var wrong = done.filter(function (it) { return !it.correct; });
-    h.push('<section class="section"><div class="section-head"><h2>' +
-      (wrong.length ? "Diese Fragen noch einmal ansehen" : "Durchsicht") + '</h2>' +
-      '<span class="section-note">' + wrong.length + ' Fehler</span></div>');
-
+    h.push('<div class="section">');
+    h.push(groupHead(wrong.length ? wrong.length + " " + plural(wrong.length, "Fehler", "Fehler") : "Durchsicht"));
     if (!wrong.length) {
-      h.push('<div class="empty">Alle Fragen dieser Runde richtig beantwortet.<br>Nimm dir als Nächstes ein Handlungsfeld mit niedrigem Beherrschungsgrad vor.</div>');
+      h.push('<div class="empty">Alle Fragen dieser Runde richtig beantwortet.<br>' +
+        "Nimm dir als Nächstes ein Handlungsfeld mit wenigen sicheren Fragen vor.</div>");
     } else {
-      h.push('<div class="review">');
+      h.push('<div class="group">');
       wrong.forEach(function (it) {
         var q = it.q;
         var chosen = it.picked.map(function (d) { return q.a[it.order[d]]; });
-        var right = q.c.map(function (i) { return q.a[i]; });
-        h.push('<details><summary>' + esc(q.q) + '</summary><div class="review-body">');
-        h.push('<p class="review-line wrong-line"><span class="lbl">Deine Antwort</span>' +
-          (chosen.length ? esc(chosen.join(" · ")) : "keine Auswahl") + '</p>');
-        h.push('<p class="review-line right-line"><span class="lbl">Richtig</span>' + esc(right.join(" · ")) + '</p>');
-        h.push('<p class="explain">' + esc(q.e) + '</p>');
-        h.push('</div></details>');
+        var rights = q.c.map(function (i) { return q.a[i]; });
+        h.push('<details class="row-details"><summary><span class="chevron">›</span><span>' +
+          esc(q.q) + "</span></summary><div class=\"detail-body\">");
+        h.push('<p class="detail-line no"><span class="detail-label">Deine Antwort</span>' +
+          (chosen.length ? esc(chosen.join(" · ")) : "keine Auswahl") + "</p>");
+        h.push('<p class="detail-line ok"><span class="detail-label">Richtig</span>' +
+          esc(rights.join(" · ")) + "</p>");
+        h.push('<p class="explain">' + esc(q.e) + "</p>");
+        h.push("</div></details>");
       });
-      h.push('</div>');
+      h.push("</div>");
     }
-    h.push('</section>');
+    h.push("</div>");
 
-    h.push('<div class="btn-row">');
-    if (wrong.length) h.push('<button class="primary" data-act="retry-wrong">Diese Fehler sofort üben</button>');
-    h.push('<button class="primary' + (wrong.length ? " ghost" : "") + '" data-act="again">Neue Runde</button>');
-    h.push('<button class="primary ghost" data-act="home">Zur Übersicht</button>');
-    h.push('</div>');
+    h.push('<div class="btn-stack">');
+    if (wrong.length) h.push('<button class="btn" data-act="retry-wrong">Diese Fehler sofort üben</button>');
+    h.push('<button class="btn' + (wrong.length ? " plain" : "") + '" data-act="again">Neue Runde</button>');
+    if (wrong.length) h.push('<button class="btn plain" data-act="home">Zur Übersicht</button>');
+    h.push("</div>");
     return h.join("");
   }
 
   /* ---------------- Steuerung ---------------- */
-
-  function isDark() {
-    if (state.theme) return state.theme === "dark";
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  }
 
   function applyTheme() {
     if (state.theme) document.documentElement.setAttribute("data-theme", state.theme);
@@ -505,32 +537,18 @@
     window.scrollTo(0, 0);
   }
 
-  function retryWrong() {
-    var wrong = run.items.filter(function (it) { return it.checked && !it.correct; });
-    if (!wrong.length) return;
-    run = {
-      mode: "lernen",
-      items: shuffle(wrong).map(function (it) {
-        return { q: it.q, order: shuffle(it.q.a.map(function (_, i) { return i; })), picked: [], checked: false, correct: null };
-      }),
-      i: 0,
-      deadline: 0
-    };
-    screen = "quiz";
-    render();
-  }
-
   document.addEventListener("click", function (ev) {
     var t = ev.target.closest("[data-act]");
     if (!t || t.disabled) return;
     var act = t.getAttribute("data-act");
+    var v = t.getAttribute("data-v");
 
-    if (act === "theme") { state.theme = isDark() ? "light" : "dark"; applyTheme(); save(); render(); }
-    else if (act === "mode") { state.mode = t.getAttribute("data-mode"); save(); render(); }
-    else if (act === "size") { state.size = parseInt(t.getAttribute("data-size"), 10); save(); render(); }
+    if (act === "theme") { state.theme = v; applyTheme(); save(); render(); }
+    else if (act === "mode") { state.mode = v; save(); render(); }
+    else if (act === "size") { state.size = parseInt(v, 10); save(); render(); }
     else if (act === "cat") {
-      var id = t.getAttribute("data-cat"), pos = state.cats.indexOf(id);
-      if (pos === -1) state.cats.push(id); else state.cats.splice(pos, 1);
+      var pos = state.cats.indexOf(v);
+      if (pos === -1) state.cats.push(v); else state.cats.splice(pos, 1);
       save(); render();
     }
     else if (act === "toggle-all") {
@@ -538,11 +556,10 @@
       save(); render();
     }
     else if (act === "start") startRun();
-    else if (act === "pick") toggle(parseInt(t.getAttribute("data-d"), 10));
+    else if (act === "pick") toggle(parseInt(v, 10));
     else if (act === "submit") submit();
     else if (act === "abort") { if (confirm("Runde beenden? Der Zwischenstand dieser Runde geht verloren.")) abortRun(); }
-    else if (act === "again") { run = null; screen = "setup"; render(); }
-    else if (act === "home") { run = null; screen = "setup"; render(); }
+    else if (act === "again" || act === "home") { run = null; screen = "setup"; render(); }
     else if (act === "retry-wrong") retryWrong();
     else if (act === "reset") {
       if (confirm("Wirklich den gesamten Lernfortschritt löschen? Das lässt sich nicht rückgängig machen.")) {
