@@ -125,6 +125,29 @@
 
   function plural(n, one, many) { return n === 1 ? one : many; }
 
+  function weakCount() {
+    return QUESTIONS.filter(function (q) { return isWeak(q.id); }).length;
+  }
+  function cdTitleText(days) {
+    return days > 0 ? plural(days, "Tag", "Tage") + " bis zur Prüfung" : "Prüfungstermin erreicht";
+  }
+  function cdSubText(days) {
+    var w = Math.round(days / 7);
+    return germanDate(state.examDate) +
+      (days > 0 ? " · rund " + Math.max(1, w) + " " + plural(w, "Woche", "Wochen") : "");
+  }
+  function modeFootText(weak) {
+    return state.mode === "fehler" && weak === 0
+      ? "Noch keine falsch beantworteten Fragen gespeichert."
+      : MODES[state.mode].desc;
+  }
+  function poolFootText(pool) {
+    return pool + " " + plural(pool, "Frage", "Fragen") + " in der aktuellen Auswahl.";
+  }
+  function startBtnText(pool) {
+    return pool ? "Runde starten" : "Bitte Handlungsfeld wählen";
+  }
+
   /* ---------------- Bausteine ---------------- */
 
   function segmented(act, items, isOn) {
@@ -139,7 +162,8 @@
 
   function groupHead(text, action) {
     return '<div class="group-head' + (action ? " with-action" : "") + '"><span>' + esc(text) + "</span>" +
-      (action ? '<button class="head-action" data-act="' + action.act + '">' + esc(action.label) + "</button>" : "") +
+      (action ? '<button class="head-action" id="toggleAll" data-act="' + action.act + '">' +
+        esc(action.label) + "</button>" : "") +
       "</div>";
   }
 
@@ -211,7 +235,7 @@
     if (pos !== -1) it.picked.splice(pos, 1);
     else if (multi) it.picked.push(displayIdx);
     else it.picked = [displayIdx];
-    render();
+    syncAnswers();
   }
 
   function evaluate(it) {
@@ -246,7 +270,7 @@
       it.checked = true;
       it.correct = evaluate(it);
       record(it);
-      render();
+      render(true);
     } else {
       advance();
     }
@@ -295,12 +319,9 @@
     h.push('<p class="large-sub">Fachwirt für Logistiksysteme · ' + total + ' Fragen in 13 Handlungsfeldern</p>');
 
     h.push('<div class="widget">');
-    h.push('<div class="widget-num tnum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
-    h.push('<div class="widget-body"><div class="widget-title">' +
-      (days > 0 ? plural(days, "Tag", "Tage") + " bis zur Prüfung" : "Prüfungstermin erreicht") + "</div>");
-    h.push('<div class="widget-sub">' + germanDate(state.examDate) +
-      (days > 0 ? " · rund " + Math.max(1, Math.round(days / 7)) + " " +
-        plural(Math.round(days / 7), "Woche", "Wochen") : "") + "</div></div>");
+    h.push('<div class="widget-num tnum" id="cdNum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
+    h.push('<div class="widget-body"><div class="widget-title" id="cdTitle">' + esc(cdTitleText(days)) + "</div>");
+    h.push('<div class="widget-sub" id="cdSub">' + esc(cdSubText(days)) + "</div></div>");
     h.push("</div>");
     h.push('<div class="section"><div class="group"><div class="row">');
     h.push('<span class="row-main"><span class="row-title">Prüfungstermin</span></span>');
@@ -319,10 +340,7 @@
     h.push(segmented("mode", Object.keys(MODES).map(function (k) {
       return { v: k, label: MODES[k].tab, disabled: k === "fehler" && weak === 0 };
     }), function (it) { return state.mode === it.v; }));
-    h.push('<div class="group-foot">' + esc(
-      state.mode === "fehler" && weak === 0
-        ? "Noch keine falsch beantworteten Fragen gespeichert."
-        : MODES[state.mode].desc) + "</div>");
+    h.push('<div class="group-foot" id="modeFoot">' + esc(modeFootText(weak)) + "</div>");
     h.push("</div>");
 
     h.push('<div class="section">');
@@ -331,8 +349,7 @@
       { v: "10", label: "10" }, { v: "20", label: "20" },
       { v: "40", label: "40" }, { v: "0", label: "Alle" }
     ], function (it) { return state.size === parseInt(it.v, 10); }));
-    h.push('<div class="group-foot">' + pool + " " + plural(pool, "Frage", "Fragen") +
-      " in der aktuellen Auswahl.</div>");
+    h.push('<div class="group-foot" id="sizeFoot">' + esc(poolFootText(pool)) + "</div>");
     h.push("</div>");
 
     MODULES.forEach(function (m, mi) {
@@ -358,8 +375,8 @@
     });
 
     h.push('<div class="section">');
-    h.push('<button class="btn" data-act="start"' + (pool ? "" : " disabled") + ">" +
-      (pool ? "Runde starten" : "Bitte Handlungsfeld wählen") + "</button>");
+    h.push('<button class="btn" id="startBtn" data-act="start"' + (pool ? "" : " disabled") + ">" +
+      esc(startBtnText(pool)) + "</button>");
     h.push("</div>");
 
     h.push('<div class="section">');
@@ -443,7 +460,8 @@
     else if (!it.checked) label = "Antwort prüfen";
     else label = run.i === run.items.length - 1 ? "Runde auswerten" : "Nächste Frage";
 
-    h.push('<button class="btn" data-act="submit"' + (it.picked.length ? "" : " disabled") + ">" + label + "</button>");
+    h.push('<button class="btn" id="submitBtn" data-act="submit"' +
+      (it.picked.length ? "" : " disabled") + ">" + label + "</button>");
     h.push('<p class="kbd-hint">Tasten 1–' + it.order.length + " zum Auswählen · Enter weiter · Esc beenden</p>");
     return h.join("");
   }
@@ -525,16 +543,83 @@
 
   /* ---------------- Steuerung ---------------- */
 
+  function qsa(sel) {
+    return Array.prototype.slice.call(document.querySelectorAll(sel));
+  }
+
+  /* Auswahlvorgänge bauen die Seite nicht neu auf, sondern ändern nur die
+     betroffenen Stellen. Dadurch bleibt die Bildlaufposition erhalten und
+     die Auswahl reagiert ohne Flackern. */
+  function syncSegment(act, isOn) {
+    qsa('[data-act="' + act + '"]').forEach(function (b) {
+      b.setAttribute("aria-pressed", isOn(b.getAttribute("data-v")));
+    });
+  }
+
+  function syncCountdown() {
+    var days = daysUntil(state.examDate);
+    var num = document.getElementById("cdNum");
+    var title = document.getElementById("cdTitle");
+    var sub = document.getElementById("cdSub");
+    if (num) num.textContent = days === null ? "–" : Math.max(0, days);
+    if (title) title.textContent = cdTitleText(days);
+    if (sub) sub.textContent = cdSubText(days);
+  }
+
+  function syncSetup() {
+    var pool = poolForRun().length;
+    var weak = weakCount();
+
+    syncSegment("mode", function (v) { return state.mode === v; });
+    syncSegment("size", function (v) { return state.size === parseInt(v, 10); });
+    syncSegment("theme", function (v) { return state.theme === v; });
+
+    qsa('[data-act="cat"]').forEach(function (b) {
+      var on = state.cats.indexOf(b.getAttribute("data-v")) !== -1;
+      b.setAttribute("aria-pressed", on);
+      var mark = b.querySelector(".row-check");
+      if (mark) mark.textContent = on ? "✓" : "";
+    });
+
+    var all = document.getElementById("toggleAll");
+    if (all) all.textContent = state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen";
+
+    var mf = document.getElementById("modeFoot");
+    if (mf) mf.textContent = modeFootText(weak);
+
+    var sf = document.getElementById("sizeFoot");
+    if (sf) sf.textContent = poolFootText(pool);
+
+    var btn = document.getElementById("startBtn");
+    if (btn) { btn.disabled = !pool; btn.textContent = startBtnText(pool); }
+  }
+
+  function syncAnswers() {
+    var it = current();
+    qsa(".answer").forEach(function (b) {
+      var d = parseInt(b.getAttribute("data-v"), 10);
+      var picked = it.picked.indexOf(d) !== -1;
+      b.setAttribute("aria-pressed", picked);
+      var bullet = b.querySelector(".bullet");
+      if (bullet) bullet.textContent = picked ? "✓" : "";
+    });
+    var btn = document.getElementById("submitBtn");
+    if (btn) btn.disabled = !it.picked.length;
+  }
+
   function applyTheme() {
     if (state.theme) document.documentElement.setAttribute("data-theme", state.theme);
     else document.documentElement.removeAttribute("data-theme");
   }
 
-  function render() {
+  /* keepScroll: bei Auflösung oder Zurücksetzen bleibt die Position stehen,
+     bei Bildschirm- und Fragewechsel beginnt die Seite wieder oben. */
+  function render(keepScroll) {
     var el = document.getElementById("app");
     if (!el) return;
+    var y = window.scrollY;
     el.innerHTML = screen === "quiz" ? quizScreen() : screen === "result" ? resultScreen() : setupScreen();
-    window.scrollTo(0, 0);
+    window.scrollTo(0, keepScroll ? y : 0);
   }
 
   document.addEventListener("click", function (ev) {
@@ -543,17 +628,17 @@
     var act = t.getAttribute("data-act");
     var v = t.getAttribute("data-v");
 
-    if (act === "theme") { state.theme = v; applyTheme(); save(); render(); }
-    else if (act === "mode") { state.mode = v; save(); render(); }
-    else if (act === "size") { state.size = parseInt(v, 10); save(); render(); }
+    if (act === "theme") { state.theme = v; applyTheme(); save(); syncSetup(); }
+    else if (act === "mode") { state.mode = v; save(); syncSetup(); }
+    else if (act === "size") { state.size = parseInt(v, 10); save(); syncSetup(); }
     else if (act === "cat") {
       var pos = state.cats.indexOf(v);
       if (pos === -1) state.cats.push(v); else state.cats.splice(pos, 1);
-      save(); render();
+      save(); syncSetup();
     }
     else if (act === "toggle-all") {
       state.cats = state.cats.length === CATEGORIES.length ? [] : CATEGORIES.map(function (c) { return c.id; });
-      save(); render();
+      save(); syncSetup();
     }
     else if (act === "start") startRun();
     else if (act === "pick") toggle(parseInt(v, 10));
@@ -563,13 +648,13 @@
     else if (act === "retry-wrong") retryWrong();
     else if (act === "reset") {
       if (confirm("Wirklich den gesamten Lernfortschritt löschen? Das lässt sich nicht rückgängig machen.")) {
-        state.stats = {}; save(); render();
+        state.stats = {}; save(); render(true);
       }
     }
   });
 
   document.addEventListener("change", function (ev) {
-    if (ev.target.id === "examDate") { state.examDate = ev.target.value; save(); render(); }
+    if (ev.target.id === "examDate") { state.examDate = ev.target.value; save(); syncCountdown(); }
   });
 
   document.addEventListener("keydown", function (ev) {

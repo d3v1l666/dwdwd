@@ -79,6 +79,8 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 - Countdown bis zum eingetragenen Prüfungstermin
 - Darstellung wahlweise automatisch (Systemeinstellung), hell oder dunkel
 - Bedienung per Tastatur am Rechner (`1`–`9` auswählen, `Enter` weiter, `Esc` beenden)
+- Auswahlvorgänge ändern nur die betroffenen Stellen der Seite; die
+  Bildlaufposition bleibt dabei erhalten
 
 Der Lernfortschritt liegt ausschließlich im `localStorage` des jeweiligen Browsers.
 Er wird nicht übertragen und geht verloren, wenn die Browserdaten gelöscht werden
