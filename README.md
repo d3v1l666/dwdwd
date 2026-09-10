@@ -1,8 +1,8 @@
 # Prüfungstrainer Logistiksysteme
 
 Lern-App zur Vorbereitung auf die IHK-Fortbildungsprüfung **Geprüfte/r Fachwirt/in für
-Logistiksysteme**. 224 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort,
-verteilt auf 13 Handlungsfelder.
+Logistiksysteme**. 250 Multiple-Choice-Fragen mit Erläuterung zu jeder Antwort,
+verteilt auf die vier Handlungsbereiche der Prüfung.
 
 Die Oberfläche folgt den iOS-Mustern – Systemschrift, gruppierte Listen, Segmented
 Controls und die Systemfarben für hell und dunkel –, damit sie sich als
@@ -71,11 +71,11 @@ holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächste
 - Einfach- und Mehrfachauswahl; bei Mehrfachauswahl zählt die Antwort nur, wenn
   genau alle richtigen Aussagen angekreuzt sind
 - Fragen und Antwortoptionen werden bei jedem Durchlauf neu gemischt
-- Auswahl von Umfang (10, 20, 40, alle) und Handlungsfeldern
+- Auswahl von Umfang (10, 20, 40, alle) und Handlungsbereichen
 - Auswertung mit Notenstufe nach IHK-Bewertungsschlüssel und Aufschlüsselung
-  nach Handlungsfeld
-- Beherrschungsgrad je Handlungsfeld: eine Frage gilt als sicher, wenn sie zweimal
-  hintereinander richtig beantwortet wurde
+  nach Handlungsbereich
+- Eigener Fortschritt je Handlungsbereich mit Balken und Trefferquote; eine Frage
+  gilt als sicher, wenn sie zweimal hintereinander richtig beantwortet wurde
 - Countdown bis zum eingetragenen Prüfungstermin
 - Darstellung wahlweise automatisch (Systemeinstellung), hell oder dunkel
 - Bedienung per Tastatur am Rechner (`1`–`9` auswählen, `Enter` weiter, `Esc` beenden)
@@ -86,20 +86,29 @@ Der Lernfortschritt liegt ausschließlich im `localStorage` des jeweiligen Brows
 Er wird nicht übertragen und geht verloren, wenn die Browserdaten gelöscht werden
 oder ein anderes Gerät verwendet wird.
 
-## Handlungsfelder
+## Handlungsbereiche
 
-**Wirtschaftsbezogene Qualifikationen** – Volks- und Betriebswirtschaft (18),
-Rechnungswesen (18), Recht und Steuern (18), Unternehmensführung (16)
+Die Fragen sind den vier Handlungsbereichen der Prüfung zugeordnet:
 
-**Handlungsspezifische Qualifikationen** – Logistikkonzeption und Supply Chain
-Management (18), Beschaffung und Materialwirtschaft (18), Produktionslogistik (14),
-Lager/Kommissionierung/Materialfluss (20), Transport und Distribution (20),
-Logistikcontrolling und Kennzahlen (16), IT-Systeme und Digitalisierung (14),
-Qualität/Umwelt/Gefahrgut/Arbeitsschutz (18), Führung und Zusammenarbeit (16)
+| | Handlungsbereich | Fragen |
+|---|---|---|
+| HB1 | Logistische Anforderungen ermitteln, analysieren und bewerten | 73 |
+| HB2 | Logistische Lösungen entwickeln und planen | 70 |
+| HB3 | Kommunikation, Führung und Zusammenarbeit | 46 |
+| HB4 | Logistische Lösungen umsetzen, bewerten und weiterentwickeln | 61 |
 
-Die Zuordnung orientiert sich an den üblichen IHK-Prüfungsinhalten. Der genaue
-Zuschnitt der Prüfungsteile steht im Rahmenplan der zuständigen Kammer und sollte
-damit abgeglichen werden.
+Zusätzlich trägt jede Frage ihr Fachthema (`topic`) – etwa *Beschaffung und
+Materialwirtschaft* oder *Transport und Distribution*. Es erscheint im Fragebogen
+unter der Frage und lässt die fachliche Herkunft erkennen, ohne die Bereichsstruktur
+aufzuweichen.
+
+Jeder Handlungsbereich hat einen eigenen Fortschritt: Balken und Angabe zeigen, wie
+viele Fragen des Bereichs bereits sicher beherrscht werden und wie hoch die
+Trefferquote darin ist. Diese Werte werden aus den Fragestatistiken abgeleitet und
+nicht getrennt gespeichert, können also nicht davon abweichen.
+
+Gleiche den Zuschnitt mit dem Rahmenplan deiner Kammer ab.
+
 
 ## Fragen ergänzen
 
@@ -107,17 +116,45 @@ Alle Inhalte stehen in `data/questions.js`. Eine Frage sieht so aus:
 
 ```js
 {
-  id: "LAG-21",              // eindeutig, Präfix = Handlungsfeld
-  cat: "lag",                // id aus window.CATEGORIES
-  q:  "Fragetext?",
-  a:  ["Option A", "Option B", "Option C"],
-  c:  [0, 2],                // Indizes der richtigen Optionen; mehr als einer => Mehrfachauswahl
-  e:  "Erläuterung, warum das richtig ist und warum die Alternativen es nicht sind."
+  id:    "LAG-21",           // dauerhafte Kennung, NIE ändern (siehe unten)
+  cat:   "ums",              // id aus window.CATEGORIES
+  topic: "Lager und Kommissionierung",   // Fachthema, frei wählbar
+  q:     "Fragetext?",
+  a:     ["Option A", "Option B", "Option C"],
+  c:     [0, 2],             // Indizes der richtigen Optionen; mehr als einer => Mehrfachauswahl
+  e:     "Erläuterung, warum das richtig ist und warum die Alternativen es nicht sind."
 }
 ```
 
-Neue Handlungsfelder werden in `window.CATEGORIES` ergänzt und über `mod` einem
-der beiden Prüfungsteile in `window.MODULES` zugeordnet.
+**Die `id` ist der Schlüssel des Lernfortschritts und darf sich nie ändern.** Sie ist
+bewusst von Kategorie und Reihenfolge entkoppelt: Fragen lassen sich beliebig
+umsortieren, umbenennen oder einem anderen Handlungsbereich zuordnen, ohne dass der
+gespeicherte Fortschritt verloren geht. Das Präfix einer Kennung spiegelt nur ihre
+Herkunft wider, nicht ihre heutige Zuordnung.
+
+## Lernfortschritt und Aktualisierungen
+
+Der Fortschritt liegt unter dem festen Schlüssel `fls-trainer` im `localStorage`:
+
+```js
+{ schema: 2,
+  settings: { theme, examDate, mode, size, cats },
+  stats:    { "<Frage-id>": { seen, right, wrong, streak } } }
+```
+
+Der Schlüssel enthält keine Versionsnummer mehr, die Fassung steht als `schema` im
+Inhalt. Beim Start prüft `adopt()` jedes Feld einzeln und setzt Unbrauchbares auf den
+Standard zurück, statt den ganzen Stand zu verwerfen. Konkret:
+
+- Einstellungen werden einzeln auf Typ und zulässigen Wert geprüft
+- Ausgewählte Handlungsbereiche, die es nicht mehr gibt, werden verworfen; bleibt
+  nichts übrig, sind wieder alle ausgewählt statt einer leeren Auswahl
+- Statistiken zu Fragen, die es nicht mehr gibt, fallen weg; alle übrigen bleiben
+- Vor einer Umstellung wird der unveränderte alte Stand unter
+  `fls-trainer-backup` gesichert, der alte Schlüssel `fls-trainer-v1` bleibt liegen
+
+Für eine künftige Schemaänderung wird `SCHEMA` erhöht und `adopt()` um die
+Umsetzung der alten Struktur ergänzt.
 
 ## Aufbau
 

@@ -3,10 +3,15 @@
 (function () {
   "use strict";
 
-  var STORE = "fls-trainer-v1";
+  /* Der Speicherschlüssel bleibt dauerhaft gleich, die Fassung steht im Inhalt.
+     Dadurch übersteht der Lernfortschritt künftige Änderungen an Fragen,
+     Kategorien und Einstellungen. */
+  var STORE = "fls-trainer";
+  var LEGACY_KEYS = ["fls-trainer-v1"];
+  var SCHEMA = 2;
+
   var QUESTIONS = window.QUESTIONS || [];
   var CATEGORIES = window.CATEGORIES || [];
-  var MODULES = window.MODULES || [];
 
   var MODES = {
     lernen:   { tab: "Lernen",  name: "Lernmodus",
@@ -54,23 +59,84 @@
     stats: {}
   };
 
+  function readStored() {
+    var keys = [STORE].concat(LEGACY_KEYS);
+    for (var i = 0; i < keys.length; i++) {
+      try {
+        var raw = localStorage.getItem(keys[i]);
+        if (raw) return { key: keys[i], raw: raw };
+      } catch (e) { return null; }   // privater Modus o. Ä.
+    }
+    return null;
+  }
+
+  function count(v) {
+    return typeof v === "number" && isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+  }
+
+  /* Jedes Feld wird einzeln geprüft und notfalls auf den Standard gesetzt.
+     Unbekannte Angaben aus älteren oder neueren Fassungen können den
+     gespeicherten Lernfortschritt dadurch nicht entwerten. */
+  function adopt(saved) {
+    var settings = saved.schema ? (saved.settings || {}) : saved;   // Fassung 1 war flach
+    var stats = saved.stats && typeof saved.stats === "object" ? saved.stats : {};
+
+    if (typeof settings.theme === "string" &&
+        ["", "light", "dark"].indexOf(settings.theme) !== -1) state.theme = settings.theme;
+    if (typeof settings.examDate === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(settings.examDate)) state.examDate = settings.examDate;
+    if (MODES[settings.mode]) state.mode = settings.mode;
+    if ([0, 10, 20, 40].indexOf(settings.size) !== -1) state.size = settings.size;
+
+    /* Nach einer Umbenennung der Handlungsbereiche zeigt die gespeicherte
+       Auswahl ins Leere. Unbekanntes wird verworfen; bleibt nichts übrig,
+       ist wieder alles ausgewählt statt einer leeren Auswahl. */
+    var known = CATEGORIES.map(function (c) { return c.id; });
+    if (Array.isArray(settings.cats)) {
+      var keep = settings.cats.filter(function (id) { return known.indexOf(id) !== -1; });
+      state.cats = keep.length ? keep : known.slice();
+    }
+
+    /* Der Lernfortschritt hängt an der unveränderlichen Fragekennung, nicht an
+       Kategorie oder Reihenfolge. Einträge zu entfernten Fragen fallen weg. */
+    var live = {};
+    QUESTIONS.forEach(function (q) { live[q.id] = true; });
+    var clean = {};
+    Object.keys(stats).forEach(function (id) {
+      if (!live[id]) return;
+      var v = stats[id] || {};
+      clean[id] = { seen: count(v.seen), right: count(v.right), wrong: count(v.wrong), streak: count(v.streak) };
+    });
+    state.stats = clean;
+  }
+
   function load() {
-    try {
-      var raw = localStorage.getItem(STORE);
-      if (!raw) return;
-      var saved = JSON.parse(raw);
-      if (!saved || typeof saved !== "object") return;
-      if (typeof saved.theme === "string") state.theme = saved.theme;
-      if (saved.examDate) state.examDate = saved.examDate;
-      if (MODES[saved.mode]) state.mode = saved.mode;
-      if (typeof saved.size === "number") state.size = saved.size;
-      if (Array.isArray(saved.cats) && saved.cats.length) state.cats = saved.cats;
-      if (saved.stats && typeof saved.stats === "object") state.stats = saved.stats;
-    } catch (e) { /* privater Modus o. Ä.: ohne gespeicherten Fortschritt weiterarbeiten */ }
+    var found = readStored();
+    if (!found) return;
+    var saved;
+    try { saved = JSON.parse(found.raw); } catch (e) { return; }
+    if (!saved || typeof saved !== "object") return;
+
+    var outdated = found.key !== STORE || saved.schema !== SCHEMA;
+    if (outdated) {
+      // Vor der Umstellung den unveränderten alten Stand sichern.
+      try { localStorage.setItem(STORE + "-backup", found.raw); } catch (e) {}
+    }
+    adopt(saved);
+    if (outdated) save();
   }
 
   function save() {
-    try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        schema: SCHEMA,
+        settings: {
+          theme: state.theme, examDate: state.examDate,
+          mode: state.mode, size: state.size, cats: state.cats
+        },
+        stats: state.stats
+      }));
+    } catch (e) {}
   }
 
   function statOf(id) { return state.stats[id] || { seen: 0, right: 0, wrong: 0, streak: 0 }; }
@@ -103,6 +169,30 @@
   }
 
   function inCat(id) { return QUESTIONS.filter(function (q) { return q.cat === id; }); }
+
+  /* Aus den Fragestatistiken abgeleitet, nie getrennt gespeichert – dadurch
+     kann der Bereichsfortschritt nicht von den Fragedaten abweichen. */
+  function catProgress(id) {
+    var qs = inCat(id);
+    var mastered = 0, right = 0, answered = 0, seen = 0;
+    qs.forEach(function (q) {
+      var st = statOf(q.id);
+      if (st.seen) seen++;
+      if (isMastered(q.id)) mastered++;
+      right += st.right;
+      answered += st.seen;
+    });
+    return {
+      total: qs.length, seen: seen, mastered: mastered,
+      quote: answered ? Math.round(right / answered * 100) : null,
+      pct: qs.length ? Math.round(mastered / qs.length * 100) : 0
+    };
+  }
+
+  function catProgressText(pr) {
+    return pr.mastered + " von " + pr.total + " sicher" +
+      (pr.quote === null ? " · noch nicht bearbeitet" : " · " + pr.quote + " % richtig");
+  }
 
   function daysUntil(dateStr) {
     var target = new Date(dateStr + "T00:00:00");
@@ -145,7 +235,7 @@
     return pool + " " + plural(pool, "Frage", "Fragen") + " in der aktuellen Auswahl.";
   }
   function startBtnText(pool) {
-    return pool ? "Runde starten" : "Bitte Handlungsfeld wählen";
+    return pool ? "Runde starten" : "Bitte Handlungsbereich wählen";
   }
 
   /* ---------------- Bausteine ---------------- */
@@ -316,7 +406,8 @@
 
     var h = [];
     h.push('<h1 class="large-title">Prüfungstrainer</h1>');
-    h.push('<p class="large-sub">Fachwirt für Logistiksysteme · ' + total + ' Fragen in 13 Handlungsfeldern</p>');
+    h.push('<p class="large-sub">Fachwirt für Logistiksysteme · ' + total +
+      " Fragen in " + CATEGORIES.length + " Handlungsbereichen</p>");
 
     h.push('<div class="widget">');
     h.push('<div class="widget-num tnum" id="cdNum">' + (days === null ? "–" : Math.max(0, days)) + "</div>");
@@ -352,27 +443,28 @@
     h.push('<div class="group-foot" id="sizeFoot">' + esc(poolFootText(pool)) + "</div>");
     h.push("</div>");
 
-    MODULES.forEach(function (m, mi) {
-      var cats = CATEGORIES.filter(function (c) { return c.mod === m.id; });
-      if (!cats.length) return;
-      h.push('<div class="section">');
-      h.push(groupHead(m.name, mi === 0 ? {
-        act: "toggle-all",
-        label: state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen"
-      } : null));
-      h.push('<div class="group">');
-      cats.forEach(function (c) {
-        var qs = inCat(c.id);
-        var mast = qs.filter(function (q) { return isMastered(q.id); }).length;
-        var on = state.cats.indexOf(c.id) !== -1;
-        h.push('<button class="row tap" data-act="cat" data-v="' + c.id + '" aria-pressed="' + on + '">');
-        h.push('<span class="row-main"><span class="row-title">' + esc(c.name) + "</span>");
-        h.push('<span class="row-sub">' + qs.length + " Fragen · " + mast + " sicher</span></span>");
-        h.push('<span class="row-check">' + (on ? "✓" : "") + "</span>");
-        h.push("</button>");
-      });
-      h.push("</div></div>");
+    h.push('<div class="section">');
+    h.push(groupHead("Handlungsbereiche", {
+      act: "toggle-all",
+      label: state.cats.length === CATEGORIES.length ? "Alle abwählen" : "Alle auswählen"
+    }));
+    h.push('<div class="group">');
+    CATEGORIES.forEach(function (c) {
+      var pr = catProgress(c.id);
+      var on = state.cats.indexOf(c.id) !== -1;
+      h.push('<button class="row tap" data-act="cat" data-v="' + c.id + '" aria-pressed="' + on + '">');
+      h.push('<span class="row-main">');
+      h.push('<span class="row-title"><b class="hb">' + esc(c.code) + "</b> " + esc(c.name) + "</span>");
+      h.push('<span class="bar"><b style="width:' + pr.pct + '%"></b></span>');
+      h.push('<span class="row-sub" data-progress="' + c.id + '">' + esc(catProgressText(pr)) + "</span>");
+      h.push("</span>");
+      h.push('<span class="row-check">' + (on ? "✓" : "") + "</span>");
+      h.push("</button>");
     });
+    h.push("</div>");
+    h.push('<div class="group-foot">Der Balken zeigt, wie viele Fragen des Bereichs du sicher beherrschst, ' +
+      "also zweimal hintereinander richtig beantwortet hast.</div>");
+    h.push("</div>");
 
     h.push('<div class="section">');
     h.push('<button class="btn" id="startBtn" data-act="start"' + (pool ? "" : " disabled") + ">" +
@@ -390,9 +482,9 @@
     h.push("</div>");
     h.push('<div class="group-foot">Bei Mehrfachauswahl zählt eine Antwort nur, wenn genau alle richtigen ' +
       'Aussagen angekreuzt sind. Die Notenstufen folgen dem IHK-Bewertungsschlüssel, bestanden ab 50 Prozent. ' +
-      'Die Zuordnung der Fragen zu den Handlungsfeldern orientiert sich an den üblichen IHK-Prüfungsinhalten – ' +
-      'gleiche den Zuschnitt mit dem Rahmenplan deiner Kammer ab. Der Fortschritt wird nur lokal in diesem ' +
-      'Browser gespeichert.</div>');
+      'Die Fragen sind den vier Handlungsbereichen zugeordnet; jede trägt zusätzlich ihr Fachthema. ' +
+      'Gleiche den Zuschnitt mit dem Rahmenplan deiner Kammer ab. Der Fortschritt wird nur lokal in diesem ' +
+      'Browser gespeichert und übersteht Aktualisierungen der App.</div>');
     h.push("</div>");
 
     return h.join("");
@@ -424,9 +516,10 @@
 
     h.push('<div class="progress"><b style="width:' + pct + '%"></b></div>');
 
-    h.push('<div class="q-cat">' + esc(c.name) + "</div>");
+    h.push('<div class="q-cat">' + esc(c.code + " · " + c.short) + "</div>");
     h.push('<h2 class="q-text">' + esc(q.q) + "</h2>");
-    h.push('<p class="q-hint">' + (multi ? "Mehrfachauswahl – alle zutreffenden Aussagen ankreuzen" : "Eine Antwort") + "</p>");
+    h.push('<p class="q-hint">' + esc(q.topic || "") + " · " +
+      (multi ? "Mehrfachauswahl, alle zutreffenden ankreuzen" : "Eine Antwort") + "</p>");
 
     h.push('<div class="section"><div class="group">');
     it.order.forEach(function (origIdx, d) {
@@ -495,13 +588,16 @@
     h.push("</div>");
 
     h.push('<div class="section">');
-    h.push(groupHead("Nach Handlungsfeld"));
+    h.push(groupHead("Nach Handlungsbereich"));
     h.push('<div class="group">');
+    var order = CATEGORIES.map(function (c) { return c.id; });
     Object.keys(byCat).sort(function (a, b) {
-      return catById(a).name.localeCompare(catById(b).name, "de");
+      return order.indexOf(a) - order.indexOf(b);
     }).forEach(function (k) {
       var v = byCat[k], n = v.r + v.w, p = Math.round(v.r / n * 100);
-      h.push('<div class="row"><span class="row-main"><span class="row-title">' + esc(catById(k).name) + "</span>");
+      var cc = catById(k);
+      h.push('<div class="row"><span class="row-main"><span class="row-title">' +
+        esc(cc.code + " · " + cc.short) + "</span>");
       h.push('<span class="bar"><b style="width:' + (v.r / n * 100) + '%"></b>' +
         '<i style="width:' + (v.w / n * 100) + '%"></i></span></span>');
       h.push('<span class="row-value">' + v.r + "/" + n + " · " + p + " %</span></div>");
@@ -513,7 +609,7 @@
     h.push(groupHead(wrong.length ? wrong.length + " " + plural(wrong.length, "Fehler", "Fehler") : "Durchsicht"));
     if (!wrong.length) {
       h.push('<div class="empty">Alle Fragen dieser Runde richtig beantwortet.<br>' +
-        "Nimm dir als Nächstes ein Handlungsfeld mit wenigen sicheren Fragen vor.</div>");
+        "Nimm dir als Nächstes einen Handlungsbereich mit wenigen sicheren Fragen vor.</div>");
     } else {
       h.push('<div class="group">');
       wrong.forEach(function (it) {
@@ -579,6 +675,10 @@
       b.setAttribute("aria-pressed", on);
       var mark = b.querySelector(".row-check");
       if (mark) mark.textContent = on ? "✓" : "";
+    });
+
+    qsa("[data-progress]").forEach(function (el) {
+      el.textContent = catProgressText(catProgress(el.getAttribute("data-progress")));
     });
 
     var all = document.getElementById("toggleAll");

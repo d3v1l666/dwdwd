@@ -583,3 +583,11 @@ details[open] .chevron { transform: rotate(90deg); }
   white-space: nowrap;
 }
 .head-action:active { opacity: .5; }
+
+/* Fortschrittsbalken innerhalb einer Listenzeile */
+.row .bar { margin: 7px 0 5px; }
+.row-title .hb {
+  font-weight: 600;
+  color: var(--tint);
+  margin-right: 2px;
+}
