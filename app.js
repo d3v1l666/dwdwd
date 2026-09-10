@@ -19,11 +19,23 @@
                 desc: "Auflösung und Erläuterung direkt nach jeder Frage." },
     pruefung: { tab: "Prüfung", name: "Prüfungssimulation",
                 desc: "Auf Zeit, Auswertung erst am Ende. 90 Sekunden je Frage." },
+    wiederholen: { tab: "Wiederholen", name: "Wiederholung",
+                desc: "Fällige Fragen nach dem Leitner-Prinzip: zuerst das, was zu kippen droht, danach Neues." },
     fehler:   { tab: "Fehler",  name: "Fehlerspeicher",
                 desc: "Nur Fragen, die zuletzt falsch beantwortet wurden." }
   };
 
   /* Der Rechentrainer ist ein eigenes Modul mit eigener Auswahl, kein Modus. */
+  /* Leitner-Fächer: Abstand in Tagen bis zur nächsten Vorlage. Richtig
+     beantwortet rückt eine Aufgabe ein Fach weiter, falsch setzt auf Fach 1
+     zurück. Dadurch kommt wieder, was zu kippen droht, statt reinem Zufall. */
+  var BOXES = [1, 3, 7, 16, 35];
+
+  function today() {
+    var d = new Date();
+    return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  }
+
   var CALC_RUN = "rechnen";
   function runName(m) { return MODES[m] ? MODES[m].name : "Rechentrainer"; }
   function isCalcMode(m) { return m === CALC_RUN; }
@@ -31,6 +43,7 @@
   var TABS = [
     { id: "fragen",  label: "Fragen" },
     { id: "rechnen", label: "Rechnen" },
+    { id: "formeln", label: "Formeln" },
     { id: "mehr",    label: "Mehr" }
   ];
 
@@ -51,6 +64,10 @@
       '<circle cx="9" cy="18.2" r="1" fill="currentColor" stroke="none"/>' +
       '<circle cx="12" cy="18.2" r="1" fill="currentColor" stroke="none"/>' +
       '<circle cx="15" cy="18.2" r="1" fill="currentColor" stroke="none"/></svg>',
+    formeln: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round"><rect x="4.5" y="2.8" width="15" height="18.4" rx="2.6"/>' +
+      '<line x1="8" y1="7.6" x2="16" y2="7.6"/><line x1="8" y1="12" x2="16" y2="12"/>' +
+      '<line x1="8" y1="16.4" x2="13" y2="16.4"/></svg>',
     mehr: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" ' +
       'stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/>' +
       '<path d="M12 2.8v2.4M12 18.8v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M2.8 12h2.4M18.8 12h2.4' +
@@ -90,6 +107,7 @@
     showFormula: true,
     examDate: nextSpringDate(),
     tab: "fragen",
+    freeMode: false,
     mode: "lernen",
     size: 20,
     cats: CATEGORIES.map(function (c) { return c.id; }),
@@ -126,6 +144,7 @@
         /^\d{4}-\d{2}-\d{2}$/.test(settings.examDate)) state.examDate = settings.examDate;
     if (MODES[settings.mode]) state.mode = settings.mode;
     if (typeof settings.showFormula === "boolean") state.showFormula = settings.showFormula;
+    if (typeof settings.freeMode === "boolean") state.freeMode = settings.freeMode;
     if ([0, 10, 20, 40].indexOf(settings.size) !== -1) state.size = settings.size;
     if ([0, 3, 5, 10].indexOf(settings.calcSize) !== -1) state.calcSize = settings.calcSize;
     for (var t = 0; t < TABS.length; t++) if (TABS[t].id === settings.tab) state.tab = settings.tab;
@@ -152,7 +171,15 @@
     Object.keys(stats).forEach(function (id) {
       if (!live[id]) return;
       var v = stats[id] || {};
-      clean[id] = { seen: count(v.seen), right: count(v.right), wrong: count(v.wrong), streak: count(v.streak) };
+      var streak = count(v.streak);
+      var box = count(v.box);
+      if (!box) box = streak >= 2 ? 3 : streak >= 1 ? 2 : 1;   // aus altem Stand ableiten
+      box = Math.max(1, Math.min(BOXES.length, box));
+      clean[id] = {
+        seen: count(v.seen), right: count(v.right), wrong: count(v.wrong), streak: streak,
+        box: box,
+        due: typeof v.due === "number" && isFinite(v.due) ? v.due : today()
+      };
     });
     state.stats = clean;
   }
@@ -179,7 +206,8 @@
         schema: SCHEMA,
         settings: {
           theme: state.theme, examDate: state.examDate, showFormula: state.showFormula,
-          tab: state.tab, mode: state.mode, size: state.size, cats: state.cats,
+          tab: state.tab, freeMode: state.freeMode,
+          mode: state.mode, size: state.size, cats: state.cats,
           calcSize: state.calcSize, calcCats: state.calcCats
         },
         stats: state.stats
@@ -187,11 +215,33 @@
     } catch (e) {}
   }
 
-  function statOf(id) { return state.stats[id] || { seen: 0, right: 0, wrong: 0, streak: 0 }; }
-  function isMastered(id) { return statOf(id).streak >= 2; }
+  function statOf(id) {
+    return state.stats[id] || { seen: 0, right: 0, wrong: 0, streak: 0, box: 1, due: 0 };
+  }
+  function isMastered(id) { return statOf(id).box >= 4; }
   function isWeak(id) {
     var s = statOf(id);
-    return s.seen > 0 && s.wrong > 0 && s.streak < 2;
+    return s.seen > 0 && s.wrong > 0 && s.box <= 2;
+  }
+  function isDue(id) {
+    var s = statOf(id);
+    return s.seen > 0 && s.due <= today();
+  }
+  function isNew(id) { return statOf(id).seen === 0; }
+
+  function dueCount(list) {
+    return list.filter(function (x) { return isDue(x.id); }).length;
+  }
+
+  /* Reihenfolge einer Runde: erst überfällige (die ältesten zuerst),
+     dann noch nie bearbeitete, zuletzt der noch nicht fällige Rest. */
+  function byDue(a, b) {
+    var sa = statOf(a.id), sb = statOf(b.id);
+    var ra = isNew(a.id) ? 1 : (sa.due <= today() ? 0 : 2);
+    var rb = isNew(b.id) ? 1 : (sb.due <= today() ? 0 : 2);
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return sa.due - sb.due;
+    return 0;
   }
 
   /* ---------------- Hilfsfunktionen ---------------- */
@@ -318,6 +368,10 @@
   function questionPool() {
     var pool = QUESTIONS.filter(function (q) { return state.cats.indexOf(q.cat) !== -1; });
     if (state.mode === "fehler") pool = pool.filter(function (q) { return isWeak(q.id); });
+    if (state.mode === "wiederholen") {
+      var faellig = pool.filter(function (q) { return isDue(q.id) || isNew(q.id); });
+      if (faellig.length) pool = faellig;   // sonst greift die Sortierung nach Fälligkeit
+    }
     return pool;
   }
   function calcPool() {
@@ -381,9 +435,14 @@
   function startRun() {
     var pool = shuffle(questionPool());
     if (!pool.length) return;
+    pool.sort(byDue);                                  // fällige zuerst
     if (state.size > 0) pool = pool.slice(0, state.size);
 
-    run = { mode: state.mode, items: makeItems(pool), i: 0, deadline: 0 };
+    run = {
+      mode: state.mode,
+      free: state.freeMode && state.mode !== "pruefung",
+      items: makeItems(pool), i: 0, deadline: 0
+    };
     if (run.mode === "pruefung") {
       run.deadline = Date.now() + run.items.length * 90000;
       startTimer();
@@ -392,10 +451,11 @@
     render();
   }
 
-  function startCalcRun() {
-    var pool = shuffle(calcPool());
+  function startCalcRun(onlyId) {
+    var pool = shuffle(onlyId ? FORMULAS.filter(function (f) { return f.id === onlyId; }) : calcPool());
     if (!pool.length) return;
-    if (state.calcSize > 0) pool = pool.slice(0, state.calcSize);
+    pool.sort(byDue);
+    if (!onlyId && state.calcSize > 0) pool = pool.slice(0, state.calcSize);
     run = { mode: CALC_RUN, items: makeItems(pool), i: 0, deadline: 0 };
     screen = "quiz";
     render();
@@ -442,11 +502,14 @@
 
   function record(it) {
     var s = statOf(it.q.id);
+    var box = it.correct ? Math.min(s.box + 1, BOXES.length) : 1;
     state.stats[it.q.id] = {
       seen: s.seen + 1,
       right: s.right + (it.correct ? 1 : 0),
       wrong: s.wrong + (it.correct ? 0 : 1),
-      streak: it.correct ? s.streak + 1 : 0
+      streak: it.correct ? s.streak + 1 : 0,
+      box: box,
+      due: today() + BOXES[box - 1]
     };
     save();
   }
@@ -484,6 +547,23 @@
     } else {
       advance();
     }
+  }
+
+  function reveal() {
+    var it = current();
+    if (it.checked) return;
+    it.revealed = true;
+    render(true);
+  }
+
+  function selfRate(gewusst) {
+    var it = current();
+    if (it.checked) return;
+    it.checked = true;
+    it.correct = !!gewusst;
+    it.picked = gewusst ? it.q.c.map(function (orig) { return it.order.indexOf(orig); }) : [];
+    record(it);
+    advance();
   }
 
   function advance() {
@@ -577,10 +657,10 @@
     h.push('<div class="widget-sub" id="cdSub">' + esc(cdSubText(days)) + "</div></div></div>");
 
     h.push('<div class="tiles">');
+    h.push(tile(String(dueCount(QUESTIONS)), "heute zur Wiederholung fällig"));
     h.push(tile(o.seen + " / " + o.total, "Fragen bearbeitet"));
     h.push(tile(o.quote + " %", "Trefferquote"));
     h.push(tile(String(o.mastered), "sicher beherrscht"));
-    h.push(tile(String(weak), "im Fehlerspeicher"));
     h.push("</div>");
 
     h.push('<div class="section">');
@@ -599,6 +679,19 @@
     ], function (it) { return state.size === parseInt(it.v, 10); }));
     h.push('<div class="group-foot" id="sizeFoot">' + esc(poolFootText(pool)) + "</div>");
     h.push("</div>");
+
+    h.push('<div class="section">');
+    h.push(groupHead("Antwortform"));
+    h.push('<div class="group">');
+    h.push('<button class="row tap" data-act="freemode" aria-pressed="' + state.freeMode + '"' +
+      (state.mode === "pruefung" ? " disabled" : "") + ">");
+    h.push('<span class="row-main"><span class="row-title">Freie Antwort</span>');
+    h.push('<span class="row-sub">' + (state.mode === "pruefung"
+      ? "In der Prüfungssimulation wird immer angekreuzt."
+      : "Frage ohne Antwortoptionen, danach selbst bewerten. Trainiert das Formulieren statt das Wiedererkennen.") +
+      "</span></span>");
+    h.push('<span class="row-check">' + (state.freeMode && state.mode !== "pruefung" ? "✓" : "") + "</span></button>");
+    h.push("</div></div>");
 
     h.push(catSection("q"));
 
@@ -654,6 +747,118 @@
     return h.join("");
   }
 
+  /* ---------------- Modul: Formeln ---------------- */
+
+  var formQuery = "";
+
+  function formelnTab() {
+    var q = formQuery.trim().toLowerCase();
+    var treffer = FORMULAS.filter(function (f) {
+      if (!q) return true;
+      return (f.name + " " + f.topic + " " + f.formulas.join(" ")).toLowerCase().indexOf(q) !== -1;
+    });
+    var anzahl = FORMULAS.reduce(function (a, f) { return a + f.formulas.length; }, 0);
+
+    var h = [];
+    h.push('<h1 class="large-title">Formeln</h1>');
+    h.push('<p class="large-sub">' + anzahl + " Formeln aus " + FORMULAS.length +
+      " Aufgaben, nach Thema geordnet. Zum Nachschlagen und für die letzten Tage vor der Prüfung.</p>");
+
+    h.push('<div class="section"><div class="group"><div class="searchfield">');
+    h.push('<input id="formSearch" type="search" autocomplete="off" placeholder="Formel oder Thema suchen" ' +
+      'aria-label="Formeln durchsuchen" value="' + esc(formQuery) + '">');
+    if (formQuery) h.push('<button class="search-clear" data-act="formclear" aria-label="Suche leeren">✕</button>');
+    h.push("</div></div>");
+    h.push('<div class="group-foot" id="formCount">' + treffer.length + " von " + FORMULAS.length +
+      " " + plural(FORMULAS.length, "Aufgabe", "Aufgaben") + " angezeigt</div></div>");
+
+    if (!treffer.length) {
+      h.push('<div class="empty">Keine Formel gefunden.<br>Versuch es mit einem anderen Begriff.</div>');
+      return h.join("");
+    }
+
+    var themen = [];
+    treffer.forEach(function (f) { if (themen.indexOf(f.topic) === -1) themen.push(f.topic); });
+    themen.sort(function (a, b) { return a.localeCompare(b, "de"); });
+
+    themen.forEach(function (thema) {
+      h.push('<div class="section">');
+      h.push(groupHead(thema));
+      h.push('<div class="group">');
+      treffer.filter(function (f) { return f.topic === thema; }).forEach(function (f) {
+        var c = catById(f.cat);
+        h.push('<div class="formel">');
+        h.push('<div class="formel-head"><span class="formel-name">' + esc(f.name) + "</span>");
+        h.push('<button class="formel-go" data-act="practice" data-v="' + esc(f.id) + '">Üben</button></div>');
+        h.push('<div class="formel-cat">' + esc(c.code + " · " + c.short) + "</div>");
+        f.formulas.forEach(function (fm) { h.push('<div class="formel-line">' + esc(fm) + "</div>"); });
+        h.push("</div>");
+      });
+      h.push("</div></div>");
+    });
+    return h.join("");
+  }
+
+  /* ---------------- Sichern und Wiederherstellen ---------------- */
+
+  function backupText() {
+    return JSON.stringify({
+      schema: SCHEMA,
+      erstellt: new Date().toISOString().slice(0, 10),
+      settings: {
+        theme: state.theme, examDate: state.examDate, showFormula: state.showFormula,
+        freeMode: state.freeMode, tab: state.tab, mode: state.mode, size: state.size,
+        cats: state.cats, calcSize: state.calcSize, calcCats: state.calcCats
+      },
+      stats: state.stats
+    });
+  }
+
+  function restoreFrom(text) {
+    var daten;
+    try { daten = JSON.parse(text); } catch (e) { return "Das ist kein gültiger Sicherungstext."; }
+    if (!daten || typeof daten !== "object" || !daten.stats || typeof daten.stats !== "object") {
+      return "In dem Text steckt kein Lernfortschritt.";
+    }
+    var anzahl = Object.keys(daten.stats).length;
+    if (!confirm("Den gespeicherten Fortschritt durch die Sicherung mit " + anzahl +
+        " Einträgen ersetzen? Der aktuelle Stand geht dabei verloren.")) return null;
+    state.stats = {};
+    adopt(daten);
+    save();
+    return "";
+  }
+
+  function backupScreen() {
+    var eintraege = Object.keys(state.stats).length;
+    var h = [];
+    h.push('<div class="navbar">');
+    h.push('<button class="nav-btn" data-act="tomehr">Zurück</button>');
+    h.push('<div class="nav-title">Fortschritt sichern</div><div class="nav-right"></div></div>');
+
+    h.push('<div class="section">');
+    h.push(groupHead("Sicherung erstellen"));
+    h.push('<div class="group"><textarea class="backup-area" id="backupOut" readonly rows="5">' +
+      esc(backupText()) + "</textarea></div>");
+    h.push('<div class="btn-stack" style="margin-top:10px">');
+    h.push('<button class="btn" data-act="copybackup">In die Zwischenablage kopieren</button></div>');
+    h.push('<div class="group-foot">' + eintraege + " " + plural(eintraege, "Eintrag", "Einträge") +
+      " sind gesichert. Bewahre den Text irgendwo auf, wo du ihn wiederfindest – " +
+      "in einer Notiz, einer Mail an dich selbst oder einer Datei.</div>");
+    h.push("</div>");
+
+    h.push('<div class="section">');
+    h.push(groupHead("Sicherung einspielen"));
+    h.push('<div class="group"><textarea class="backup-area" id="backupIn" rows="5" ' +
+      'placeholder="Gesicherten Text hier einfügen"></textarea></div>');
+    h.push('<div class="btn-stack" style="margin-top:10px">');
+    h.push('<button class="btn plain" data-act="restore">Fortschritt ersetzen</button></div>');
+    h.push('<div class="group-foot" id="restoreHint">Der eingespielte Stand ersetzt den vorhandenen ' +
+      "vollständig. Einträge zu Fragen, die es nicht mehr gibt, werden dabei still verworfen.</div>");
+    h.push("</div>");
+    return h.join("");
+  }
+
   /* ---------------- Modul: Mehr ---------------- */
 
   function mehrTab() {
@@ -690,6 +895,15 @@
       function (it) { return state.theme === it.v; }));
     h.push("</div>");
 
+    h.push('<div class="section">');
+    h.push(groupHead("Datensicherung"));
+    h.push('<div class="group">');
+    h.push('<button class="row tap" data-act="tobackup"><span class="row-main">' +
+      '<span class="row-title">Fortschritt sichern und wiederherstellen</span>' +
+      '<span class="row-sub">Schützt vor Verlust, wenn die App gelöscht wird oder der Browser aufräumt</span>' +
+      '</span><span class="row-chevron">›</span></button>');
+    h.push("</div></div>");
+
     h.push('<div class="section"><div class="group">');
     h.push('<button class="row tap destructive row-pad" data-act="reset">Fortschritt zurücksetzen</button>');
     h.push("</div>");
@@ -704,6 +918,7 @@
 
   function setupScreen() {
     var body = state.tab === "rechnen" ? rechnenTab()
+             : state.tab === "formeln" ? formelnTab()
              : state.tab === "mehr" ? mehrTab()
              : fragenTab();
     return body + tabbar();
@@ -722,6 +937,8 @@
     var c = catById(q.cat);
     var multi = q.c.length > 1;
     var exam = run.mode === "pruefung";
+    var freiLauf = !!run.free;              // Runde läuft mit freier Antwort
+    var frei = freiLauf && !!it.revealed;   // Auflösung ist sichtbar
     var pct = (run.i + (it.checked ? 1 : 0)) / run.items.length * 100;
 
     var h = [];
@@ -732,39 +949,63 @@
       (exam ? '<span class="nav-timer" id="timer">' + clockText(run.deadline - Date.now()) + "</span>" : "") +
       "</div>");
     h.push("</div>");
-
     h.push('<div class="progress"><b style="width:' + pct + '%"></b></div>');
 
     h.push('<div class="q-cat">' + esc(c.code + " · " + c.short) + "</div>");
     h.push('<h2 class="q-text">' + esc(q.q) + "</h2>");
     h.push('<p class="q-hint">' + esc(q.topic || "") + " · " +
-      (multi ? "Mehrfachauswahl, alle zutreffenden ankreuzen" : "Eine Antwort") + "</p>");
+      (freiLauf ? "Freie Antwort" + (multi ? " · mehrere Aussagen treffen zu" : "")
+                : multi ? "Mehrfachauswahl, alle zutreffenden ankreuzen" : "Eine Antwort") + "</p>");
+
+    if (freiLauf && !it.revealed) {
+      h.push('<div class="section"><div class="group"><div class="task-text">' +
+        "Formuliere die Antwort für dich – laut, im Kopf oder auf Papier. Erst danach auflösen." +
+        "</div></div></div>");
+      h.push('<button class="btn" id="submitBtn" data-act="reveal">Auflösen</button>');
+      h.push('<p class="kbd-hint">Enter auflösen · Esc beenden</p>');
+      return h.join("");
+    }
 
     h.push('<div class="section"><div class="group">');
     it.order.forEach(function (origIdx, d) {
       var picked = it.picked.indexOf(d) !== -1;
       var correct = q.c.indexOf(origIdx) !== -1;
       var cls = "answer", glyph = "✓";
-      if (it.checked && !exam) {
+      if (frei) {
+        if (correct) cls += " right"; else cls += " missed-out";
+      } else if (it.checked && !exam) {
         if (picked && correct) cls += " right";
         else if (picked && !correct) { cls += " wrong"; glyph = "✕"; }
         else if (!picked && correct) cls += " missed";
       }
-      var showGlyph = picked || (it.checked && !exam && correct);
+      var showGlyph = frei ? correct : (picked || (it.checked && !exam && correct));
       h.push('<button class="' + cls + '" data-act="pick" data-v="' + d + '" aria-pressed="' + picked + '"' +
-        (it.checked ? " disabled" : "") + ">");
+        (it.checked || frei ? " disabled" : "") + ">");
       h.push('<span class="bullet">' + (showGlyph ? glyph : "") + "</span>");
       h.push('<span class="answer-text">' + esc(q.a[origIdx]) + "</span>");
       h.push("</button>");
     });
     h.push("</div></div>");
 
-    if (it.checked && !exam) {
+    if ((it.checked && !exam) || frei) {
       h.push('<div class="section"><div class="group">');
-      h.push('<div class="verdict ' + (it.correct ? "ok" : "no") + '">' +
-        (it.correct ? "✓ Richtig" : "✕ Falsch") + "</div>");
+      if (!frei) {
+        h.push('<div class="verdict ' + (it.correct ? "ok" : "no") + '">' +
+          (it.correct ? "✓ Richtig" : "✕ Falsch") + "</div>");
+      }
       h.push('<p class="explain">' + esc(q.e) + "</p>");
       h.push("</div></div>");
+    }
+
+    if (frei) {
+      h.push('<div class="section">');
+      h.push(groupHead("Wie sicher warst du?"));
+      h.push('<div class="btn-stack">');
+      h.push('<button class="btn ok" data-act="selfrate" data-v="1">Wusste ich</button>');
+      h.push('<button class="btn plain no" data-act="selfrate" data-v="0">Wusste ich nicht</button>');
+      h.push("</div></div>");
+      h.push('<p class="kbd-hint">1 wusste ich · 2 wusste ich nicht · Esc beenden</p>');
+      return h.join("");
     }
 
     var label;
@@ -1202,9 +1443,12 @@
     var y = window.scrollY;
     el.innerHTML = screen === "quiz"
       ? (current().calc ? calcScreen() : quizScreen())
-      : screen === "result" ? resultScreen() : setupScreen();
+      : screen === "result" ? resultScreen()
+      : screen === "backup" ? backupScreen() : setupScreen();
     var imRechnen = screen === "quiz" && !!run && current().calc;
     document.body.classList.toggle("has-tabbar", screen === "setup");
+    var suche = document.getElementById("formSearch");
+    if (suche && formQuery) { suche.focus(); suche.setSelectionRange(formQuery.length, formQuery.length); }
     document.body.classList.toggle("has-calc", imRechnen);
     renderCalculator();   // räumt sich außerhalb des Rechenmoduls selbst ab
     window.scrollTo(0, keepScroll ? y : 0);
@@ -1246,6 +1490,32 @@
     }
     else if (act === "start") startRun();
     else if (act === "startcalc") startCalcRun();
+    else if (act === "practice") { state.tab = "rechnen"; startCalcRun(v); }
+    else if (act === "freemode") { state.freeMode = !state.freeMode; save(); render(true); }
+    else if (act === "reveal") reveal();
+    else if (act === "formclear") { formQuery = ""; render(true); }
+    else if (act === "tobackup") { screen = "backup"; render(); }
+    else if (act === "tomehr") { screen = "setup"; state.tab = "mehr"; save(); render(); }
+    else if (act === "copybackup") {
+      var feld = document.getElementById("backupOut");
+      if (feld) {
+        feld.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        if (navigator.clipboard) navigator.clipboard.writeText(feld.value).catch(function () {});
+        t.textContent = "Kopiert";
+        setTimeout(function () { t.textContent = "In die Zwischenablage kopieren"; }, 1600);
+      }
+    }
+    else if (act === "restore") {
+      var quelle = document.getElementById("backupIn");
+      var hinweis = document.getElementById("restoreHint");
+      if (quelle) {
+        var fehler = restoreFrom(quelle.value);
+        if (fehler === "") { screen = "setup"; state.tab = "mehr"; render(); alert("Fortschritt wiederhergestellt."); }
+        else if (fehler && hinweis) { hinweis.textContent = fehler; hinweis.className = "group-foot warn"; }
+      }
+    }
+    else if (act === "selfrate") selfRate(v === "1");
     else if (act === "calc-open") { calc.open = true; renderCalculator(); }
     else if (act === "calc-close") { calc.open = false; renderCalculator(); }
     else if (act === "calc-key") calcKey(v);
@@ -1271,6 +1541,11 @@
   });
 
   document.addEventListener("input", function (ev) {
+    if (ev.target.id === "formSearch") {
+      formQuery = ev.target.value;
+      render(true);
+      return;
+    }
     var i = ev.target.getAttribute && ev.target.getAttribute("data-i");
     if (i === null || i === undefined || !run) return;
     var it = current();
@@ -1290,6 +1565,18 @@
       ev.preventDefault(); submit(); return;
     }
     if (ev.target.tagName === "INPUT") return;
+    if (run.free) {
+      var itf = current();
+      if (!itf.revealed) {
+        if (ev.key === "Enter") { ev.preventDefault(); reveal(); }
+      } else if (ev.key === "1") { ev.preventDefault(); selfRate(true); }
+      else if (ev.key === "2") { ev.preventDefault(); selfRate(false); }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        if (confirm("Runde beenden? Der Zwischenstand dieser Runde geht verloren.")) abortRun();
+      }
+      return;
+    }
     if (current().calc) {
       if (ev.key === "Enter") { ev.preventDefault(); submit(); }
       else if (ev.key === "Escape") {

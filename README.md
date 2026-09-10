@@ -63,9 +63,10 @@ Die App gliedert sich über eine Leiste am unteren Rand in drei Module:
 
 | Modul | Inhalt |
 |---|---|
-| **Fragen** | Multiple-Choice-Training mit Lernmodus, Prüfungssimulation und Fehlerspeicher |
+| **Fragen** | Multiple-Choice und freie Antwort, mit Lernmodus, Prüfungssimulation, Wiederholung und Fehlerspeicher |
 | **Rechnen** | Verbundaufgaben im Prüfungsformat mit eigenem Fortschritt und eingebautem Rechner |
-| **Mehr** | Prüfungstermin, Gesamtfortschritt, Darstellung, Zurücksetzen |
+| **Formeln** | Alle Formeln der Rechenaufgaben zum Nachschlagen, durchsuchbar |
+| **Mehr** | Prüfungstermin, Gesamtfortschritt, Darstellung, Datensicherung, Zurücksetzen |
 
 Umfang und Handlungsbereiche werden **je Modul getrennt** gewählt und gespeichert.
 Wer im Rechenmodul nur HB2 üben will, verändert damit nicht die Auswahl im
@@ -78,6 +79,7 @@ Fragenmodul. Während einer laufenden Runde blendet sich die Modul-Leiste aus.
 | Modus | Verhalten |
 |---|---|
 | Lernmodus | Auflösung und Erläuterung direkt nach jeder Frage |
+| Wiederholung | fällige Fragen nach dem Leitner-Prinzip, danach Neues |
 | Prüfungssimulation | auf Zeit (90 Sekunden je Frage), Auswertung erst am Ende |
 | Fehlerspeicher | nur Fragen, die zuletzt falsch beantwortet wurden |
 | Rechentrainer | Verbundaufgaben im Prüfungsformat mit Teilaufgaben und immer neuen Zahlen |
@@ -101,6 +103,54 @@ Fragenmodul. Während einer laufenden Runde blendet sich die Modul-Leiste aus.
 Der Lernfortschritt liegt ausschließlich im `localStorage` des jeweiligen Browsers.
 Er wird nicht übertragen und geht verloren, wenn die Browserdaten gelöscht werden
 oder ein anderes Gerät verwendet wird.
+
+## Wiederholung nach dem Leitner-Prinzip
+
+Jede Frage und jede Rechenaufgabe liegt in einem von fünf Fächern und hat ein
+Fälligkeitsdatum. Richtig beantwortet rückt sie ein Fach weiter und wird später
+wieder vorgelegt, falsch beantwortet fällt sie auf Fach 1 zurück:
+
+| Fach | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| Nächste Vorlage in | 1 Tag | 3 Tagen | 7 Tagen | 16 Tagen | 35 Tagen |
+
+Der Modus **Wiederholung** zieht zuerst die überfälligen Aufgaben (die ältesten
+zuerst), dann noch nie bearbeitete, zuletzt den noch nicht fälligen Rest. Auch die
+übrigen Modi und das Rechenmodul ordnen ihre Runde nach Fälligkeit, statt rein
+zufällig zu ziehen. Auf der Startseite steht, wie viele Aufgaben heute fällig sind.
+
+Als **sicher beherrscht** gilt eine Aufgabe ab Fach 4, also wenn sie mindestens
+16 Tage Abstand erreicht hat.
+
+## Freie Antwort
+
+Vor dem Start einer Runde lässt sich im Fragenmodul unter *Antwortform* die **freie
+Antwort** einschalten. Die Frage erscheint dann ohne Antwortoptionen: Du formulierst
+die Antwort selbst, tippst auf *Auflösen* und bewertest dich mit **Wusste ich** oder
+**Wusste ich nicht**. Diese Selbsteinschätzung steuert das Leitner-Fach genauso wie
+eine angekreuzte Antwort.
+
+Das trainiert das Formulieren statt das Wiedererkennen – in der schriftlichen Prüfung
+gibt es keine vier Optionen. In der Prüfungssimulation ist die Option deaktiviert,
+dort wird immer angekreuzt.
+
+## Formelsammlung
+
+Das Modul **Formeln** listet alle Formeln der Rechenaufgaben nach Thema geordnet, mit
+Handlungsbereich und einem Verweis *Üben*, der genau diese eine Aufgabe startet. Über
+das Suchfeld lässt sich nach Formel, Name oder Thema filtern.
+
+## Fortschritt sichern und wiederherstellen
+
+Unter *Mehr → Datensicherung* steht der gesamte Lernfortschritt als Text bereit, den
+ein Knopf in die Zwischenablage legt. Bewahre ihn in einer Notiz oder einer Mail an
+dich selbst auf. Im zweiten Feld lässt er sich wieder einspielen; der vorhandene Stand
+wird dabei nach Rückfrage vollständig ersetzt, ungültige Eingaben werden abgefangen und
+ändern nichts.
+
+Das ist die Absicherung gegen den Verlust durch gelöschte Home-Bildschirm-App oder
+aufgeräumte Browserdaten und zugleich der Weg, den Stand zwischen Handy und Rechner
+zu übertragen.
 
 ## Rechentrainer
 
@@ -242,9 +292,14 @@ Der Fortschritt liegt unter dem festen Schlüssel `fls-trainer` im `localStorage
 
 ```js
 { schema: 2,
-  settings: { theme, examDate, mode, size, cats },
-  stats:    { "<Frage-id>": { seen, right, wrong, streak } } }
+  settings: { theme, examDate, showFormula, freeMode, tab,
+              mode, size, cats, calcSize, calcCats },
+  stats:    { "<Frage-id>": { seen, right, wrong, streak, box, due } } }
 ```
+
+`box` ist das Leitner-Fach (1 bis 5), `due` der Tagesindex der nächsten Fälligkeit.
+Fehlen beide in einem älteren Stand, leitet `adopt()` das Fach aus `streak` ab und
+setzt die Fälligkeit auf heute.
 
 Der Schlüssel enthält keine Versionsnummer mehr, die Fassung steht als `schema` im
 Inhalt. Beim Start prüft `adopt()` jedes Feld einzeln und setzt Unbrauchbares auf den

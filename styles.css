@@ -810,3 +810,64 @@ textarea,
 details summary {
   touch-action: manipulation;
 }
+
+/* ---------- Formelsammlung ---------- */
+.searchfield { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.searchfield input {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 17px;
+  background: transparent; border: 0; color: var(--label);
+  padding: 6px 0;
+}
+.searchfield input::-webkit-search-cancel-button { display: none; }
+.search-clear {
+  background: var(--fill); border: 0; border-radius: 50%;
+  width: 22px; height: 22px; color: var(--label-2);
+  font-size: 12px; line-height: 1; flex: none;
+}
+
+.formel { position: relative; padding: 13px 16px; }
+.formel + .formel::before {
+  content: ""; position: absolute; top: 0; left: 16px; right: 0;
+  height: 1px; background: var(--separator); transform: scaleY(.5); transform-origin: top;
+}
+.formel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.formel-name { font-size: 17px; font-weight: 600; line-height: 1.3; }
+.formel-go {
+  background: none; border: 0; padding: 0;
+  font-size: 15px; font-weight: 500; color: var(--tint); white-space: nowrap;
+}
+.formel-go:active { opacity: .5; }
+.formel-cat {
+  font-size: 12px; color: var(--label-2);
+  text-transform: uppercase; letter-spacing: .05em; margin: 2px 0 7px;
+}
+.formel-line {
+  font-size: 15px; line-height: 1.45; color: var(--label-2);
+  padding-left: 12px; border-left: 2px solid var(--separator); margin-bottom: 5px;
+}
+.formel-line:last-child { margin-bottom: 0; }
+
+.row-chevron { color: var(--label-3); font-size: 19px; flex: none; }
+
+/* ---------- Datensicherung ---------- */
+.backup-area {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: transparent;
+  border: 0;
+  color: var(--label-2);
+  padding: 13px 16px;
+  resize: vertical;
+  display: block;
+}
+.backup-area:focus { outline: none; color: var(--label); }
+.group-foot.warn { color: var(--red); }
+
+/* ---------- Freie Antwort ---------- */
+.answer.missed-out { opacity: .5; }
+.btn.ok { background: var(--green); color: #FFF; }
+.btn.plain.no { color: var(--red); }
