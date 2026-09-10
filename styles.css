@@ -600,10 +600,19 @@ details[open] .chevron { transform: rotate(90deg); }
   color: var(--label);
 }
 .task-text {
-  padding: 13px 16px;
+  padding: 14px 16px 10px;
   font-size: 17px;
+  line-height: 1.42;
+  color: var(--label);
+}
+/* Der Arbeitsauftrag hebt sich von der Ausgangssituation ab. */
+.task-ask {
+  padding: 0 16px 14px;
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1.35;
 }
+.task-ask + .row::before,
 .task-text + .row::before { left: 0; }
 
 .numfield {

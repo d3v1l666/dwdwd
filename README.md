@@ -98,6 +98,11 @@ Bezugspreis, Deckungsbeitrag, Amortisationsdauer, frachtpflichtiges Gewicht in d
 Luftfracht, Auslastungsgrad, Kosten je Tonnenkilometer, Termintreue, ppm-Fehlerquote
 sowie Personalbedarf, Fehlzeiten- und Fluktuationsquote.
 
+Die Aufgaben sind wie in der Prüfung **situationsbezogen** aufgebaut: zuerst eine
+Ausgangssituation von drei bis vier Sätzen mit Unternehmen, Anlass und
+Rahmenbedingungen, darunter hervorgehoben der Arbeitsauftrag (*Ermitteln Sie …*,
+*Berechnen Sie …*), darunter die gegebenen Werte als Liste.
+
 Zu jeder Aufgabe steht die benötigte **Formel** über der Aufgabenstellung; sie lässt
 sich mit einem Tippen ausblenden, wer sich selbst prüfen will. Nach dem Prüfen
 erscheinen die richtige Lösung und der vollständige Rechenweg Schritt für Schritt.
@@ -124,7 +129,9 @@ Satz Zahlen und liefert Aufgabentext, Angaben, Lösung und Rechenweg:
   make: function () {
     var uh = ri(4, 14), bestand = ri(15, 45) * 10000;
     return {
-      text:  "Wie oft wird der Lagerbestand im Jahr umgeschlagen?",
+      text:  "Die Nordfracht Logistik GmbH betreibt ein Zentrallager … " +
+             "Wareneinsatz und durchschnittlicher Lagerbestand liegen vor.",
+      ask:   "Ermitteln Sie die Umschlagshäufigkeit.",
       given: [["Wareneinsatz im Jahr", eur(uh * bestand)],
               ["Durchschnittlicher Lagerbestand", eur(bestand)]],
       value: uh,                          // exakte Lösung
@@ -133,6 +140,9 @@ Satz Zahlen und liefert Aufgabentext, Angaben, Lösung und Rechenweg:
   }
 }
 ```
+
+Schreibe `text` als Ausgangssituation über drei bis vier Sätze mit Unternehmen und
+Anlass und `ask` als einzelnen Arbeitsauftrag – so ist der Aufbau der Prüfung.
 
 Wähle die Zufallswerte so, dass sich ein sauberes Ergebnis einstellt – am besten das
 Ergebnis zuerst ziehen und die Angaben daraus ableiten (oben: `uh` zuerst, der

@@ -646,6 +646,7 @@
     h.push('<div class="section">');
     h.push(groupHead("Aufgabe"));
     h.push('<div class="group"><div class="task-text">' + esc(t.text) + "</div>");
+    if (t.ask) h.push('<div class="task-ask">' + esc(t.ask) + "</div>");
     t.given.forEach(function (g) {
       h.push('<div class="row"><span class="row-main"><span class="row-title">' + esc(g[0]) +
         '</span></span><span class="row-value">' + esc(g[1]) + "</span></div>");

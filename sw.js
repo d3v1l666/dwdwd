@@ -2,7 +2,7 @@
    Strategie: sofort aus dem Cache ausliefern, im Hintergrund aktualisieren
    (stale-while-revalidate). Neue Fassungen sind damit beim übernächsten
    Start aktiv, ohne dass die Cache-Version hochgezählt werden muss. */
-var CACHE = "fls-trainer-v6";
+var CACHE = "fls-trainer-v7";
 
 var ASSETS = [
   "./",
