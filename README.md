@@ -13,6 +13,33 @@ Für unterwegs oder offline: `node build.js` erzeugt unter `dist/` zusätzlich
 `pruefungstrainer.html`, eine einzelne Datei mit allem darin. Die lässt sich kopieren,
 per Mail verschicken und per Doppelklick öffnen.
 
+## Auf dem iPhone installieren
+
+Die App ist eine PWA und lässt sich ohne App Store und ohne Entwicklerkonto auf den
+Home-Bildschirm legen. Voraussetzung ist, dass sie über HTTPS erreichbar ist –
+GitHub Pages übernimmt das (siehe unten).
+
+1. Seite in **Safari** öffnen (nicht in Chrome – nur Safari kann unter iOS installieren)
+2. Teilen-Symbol antippen
+3. **Zum Home-Bildschirm** wählen, mit *Hinzufügen* bestätigen
+
+Danach liegt sie mit eigenem Icon auf dem Home-Bildschirm, startet ohne Browserleiste
+und funktioniert **offline** – der Service Worker legt Fragen, Programm und Schriften
+im Gerät ab. Der Lernfortschritt dieser Home-Bildschirm-App ist ein eigener Speicher,
+getrennt von dem in der normalen Safari-Ansicht.
+
+Unter Android geht es genauso über *Menü → App installieren*.
+
+## Veröffentlichen über GitHub Pages
+
+`.github/workflows/pages.yml` veröffentlicht bei jedem Push automatisch. Falls die
+Seite noch nicht erreichbar ist, einmalig unter **Settings → Pages** als Quelle
+*GitHub Actions* auswählen und den Workflow unter *Actions* erneut starten.
+
+Nach dem Umbenennen von Fragen oder Programmteilen genügt ein Push; der Service
+Worker holt geänderte Dateien im Hintergrund nach und aktiviert sie beim
+übernächsten Start.
+
 ## Was die App kann
 
 **Drei Modi**
@@ -77,9 +104,13 @@ der beiden Prüfungsteile in `window.MODULES` zugeordnet.
 ## Aufbau
 
 ```
-index.html          Gerüst
-styles.css          Gestaltung, helles und dunkles Farbschema
-app.js              Ablauf, Auswertung, Speicherung
-data/questions.js   Fragenkatalog und Handlungsfelder
-build.js            erzeugt die Einzeldatei-Fassungen in dist/
+index.html              Gerüst und Einbindung
+styles.css              Gestaltung, helles und dunkles Farbschema
+app.js                  Ablauf, Auswertung, Speicherung
+data/questions.js       Fragenkatalog und Handlungsfelder
+build.js                erzeugt die Einzeldatei-Fassungen in dist/
+manifest.webmanifest    Name, Icons und Startverhalten der installierten App
+sw.js                   Service Worker für den Offlinebetrieb
+icons/                  App-Icons einschließlich apple-touch-icon
+.github/workflows/      Veröffentlichung über GitHub Pages
 ```
