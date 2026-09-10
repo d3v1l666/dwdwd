@@ -32,13 +32,23 @@ Unter Android geht es genauso über *Menü → App installieren*.
 
 ## Veröffentlichen über GitHub Pages
 
-`.github/workflows/pages.yml` veröffentlicht bei jedem Push automatisch. Falls die
-Seite noch nicht erreichbar ist, einmalig unter **Settings → Pages** als Quelle
-*GitHub Actions* auswählen und den Workflow unter *Actions* erneut starten.
+Einmalig einzurichten, weil ein Workflow die Pages-Seite nicht selbst anlegen darf:
 
-Nach dem Umbenennen von Fragen oder Programmteilen genügt ein Push; der Service
-Worker holt geänderte Dateien im Hintergrund nach und aktiviert sie beim
-übernächsten Start.
+1. Im Repository auf **Settings → Pages**
+2. Unter *Build and deployment* als **Source** den Eintrag **GitHub Actions** wählen
+3. Unter **Actions → GitHub Pages** den Workflow einmal über *Run workflow* starten
+
+Danach liegt die App unter `https://d3v1l666.github.io/dwdwd/` und wird bei jedem
+weiteren Push automatisch aktualisiert. Bis Schritt 2 erledigt ist, scheitert der
+Workflow mit *Get Pages site failed – Not Found*; das ist erwartbar.
+
+Wer ohne Actions auskommen möchte, wählt unter *Source* stattdessen **Deploy from a
+branch** mit dem Branch `claude/fachwirt-logistik-exam-app-y5z8io` und dem Ordner
+`/ (root)` – die App liegt bereits im Wurzelverzeichnis. In dem Fall kann
+`.github/workflows/pages.yml` gelöscht werden.
+
+Nach Änderungen an Fragen oder Programmteilen genügt ein Push; der Service Worker
+holt geänderte Dateien im Hintergrund nach und aktiviert sie beim übernächsten Start.
 
 ## Was die App kann
 
